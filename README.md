@@ -5,8 +5,8 @@ und PostgreSQL. Es sind noch keine Domainmodelle oder Alumni-Daten enthalten.
 
 ## Voraussetzungen
 
-- Node.js 22 empfohlen (ab 22.12); die Anwendung wurde auch mit 20.19 geprüft.
-  Eine transitive Prisma-CLI-Abhängigkeit verlangt bereits Node.js 22.
+- Node.js 22.23.3 (lokal und CI über `.nvmrc`, Docker über den Image-Tag).
+  `package.json#engines` unterstützt ausschließlich Node.js 22 ab diesem Patchstand.
 - npm
 - Docker mit Docker Compose
 
@@ -33,6 +33,8 @@ einzurichten. Die Anwendung bindet auf dem Host zunächst nur an Loopback.
 ## Lokale Entwicklung und Prüfungen
 
 ```sh
+nvm install
+nvm use
 npm ci
 npm run db:generate
 npm run dev
@@ -56,3 +58,6 @@ und nicht in den Docker-Build-Kontext übernommen.
 Neue fachliche Migrationen werden später mit `npm run db:migrate` erstellt und
 versioniert. Produktionsmigrationen laufen über `npm run db:deploy`; es gibt
 keinen automatischen Seed.
+
+Die Analyse verbleibender Dependency- und ESLint-Probleme steht in
+[`docs/DEPENDENCY_AUDIT.md`](docs/DEPENDENCY_AUDIT.md).
