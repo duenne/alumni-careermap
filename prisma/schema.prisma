@@ -46,6 +46,11 @@ enum CareerStepTemporalStatus {
   UNKNOWN
 }
 
+enum AlumniTimelineItemType {
+  DEGREE
+  CAREER_STEP
+}
+
 model Institution {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -103,9 +108,10 @@ model Alumni {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
-  degrees     Degree[]
-  responses   SurveyResponse[]
-  careerSteps CareerStep[]
+  degrees       Degree[]
+  responses     SurveyResponse[]
+  careerSteps   CareerStep[]
+  timelineItems AlumniTimelineItem[]
 }
 
 model Degree {
@@ -127,6 +133,7 @@ model Degree {
   program            Program?         @relation(fields: [programId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   institution        Institution?     @relation(fields: [institutionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   referenceResponses SurveyResponse[]
+  timelineItems      AlumniTimelineItem[]
 
   @@unique([alumniId, id])
   @@index([programId])
@@ -148,11 +155,31 @@ model CareerStep {
   startYear      Int?
   endYear        Int?
 
-  alumni       Alumni        @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  organisation Organisation? @relation(fields: [organisationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  alumni        Alumni        @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organisation  Organisation? @relation(fields: [organisationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  timelineItems AlumniTimelineItem[]
 
   @@unique([alumniId, id])
   @@index([organisationId])
+}
+
+model AlumniTimelineItem {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt    DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId     String                 @db.Uuid
+  type         AlumniTimelineItemType
+  position     Int
+  // Target uniqueness enforces one item per station; Prisma uses inverse lists
+  // for the composite ownership relations without redundant composite indexes.
+  degreeId     String?                @unique @db.Uuid
+  careerStepId String?                @unique @db.Uuid
+
+  alumni     Alumni      @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  degree     Degree?     @relation(fields: [alumniId, degreeId], references: [alumniId, id], onDelete: Cascade, onUpdate: NoAction)
+  careerStep CareerStep? @relation(fields: [alumniId, careerStepId], references: [alumniId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alumniId, position])
 }
 
 model SurveyResponse {

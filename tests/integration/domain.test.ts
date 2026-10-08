@@ -42,10 +42,10 @@ beforeEach(async () => { db = await pool.connect(); await db.query("BEGIN"); });
 afterEach(async () => { await db.query("ROLLBACK"); db.release(); });
 afterAll(async () => { await pool.end(); });
 
-describe("Phase A through B.2 database contract", () => {
-  it("contains only eight domain tables and pseudonymized Alumni columns", async () => {
+describe("Phase A through B.3 database contract", () => {
+  it("contains only nine domain tables and pseudonymized Alumni columns", async () => {
     const tables = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename");
-    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "CareerStep", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
+    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "AlumniTimelineItem", "CareerStep", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
     const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Alumni' ORDER BY ordinal_position");
     expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt"]);
   });
@@ -55,13 +55,14 @@ describe("Phase A through B.2 database contract", () => {
     const response = await insert("SurveyResponse", { surveyId: survey.id, alumniId: alumni.id, referenceDegreeId: degree.id, confirmedAt: new Date().toISOString() });
     const organisation = await insert("Organisation", { name: "Organisation A" });
     const careerStep = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" });
-    for (const row of [institution, program, survey, alumni, degree, response, organisation, careerStep]) {
+    const timelineItem = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    for (const row of [institution, program, survey, alumni, degree, response, organisation, careerStep, timelineItem]) {
       expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(row.createdAt).toBeInstanceOf(Date);
       expect(row.updatedAt).toBeInstanceOf(Date);
     }
     const columns = await db.query("SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND column_name IN ('createdAt', 'updatedAt', 'confirmedAt')");
-    expect(columns.rows).toHaveLength(17);
+    expect(columns.rows).toHaveLength(19);
     for (const row of columns.rows) expect(row).toEqual({ data_type: "timestamp with time zone", is_nullable: "NO" });
     const triggers = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)");
     expect(triggers.rows).toEqual([]);
@@ -74,6 +75,7 @@ describe("Phase A through B.2 database contract", () => {
       DegreeStatus: ["IN_PROGRESS", "COMPLETED", "ENDED_WITHOUT_DEGREE", "UNKNOWN"],
       CareerStepType: ["EMPLOYMENT", "INTERNSHIP", "EDUCATION", "VOCATIONAL_TRAINING", "VOLUNTEERING", "SELF_EMPLOYMENT", "UNEMPLOYED", "OTHER"],
       CareerStepTemporalStatus: ["ONGOING", "ENDED", "UNKNOWN"],
+      AlumniTimelineItemType: ["DEGREE", "CAREER_STEP"],
     })) {
       const result = await db.query("SELECT enumlabel FROM pg_enum WHERE enumtypid = $1::regtype ORDER BY enumsortorder", [`"${type}"`]);
       expect(result.rows.map(row => row.enumlabel)).toEqual(labels);
@@ -485,6 +487,252 @@ describe("CareerStep", () => {
       { name: "CareerStep_organisationId_idx", indisunique: false, indimmediate: true, columns: ["organisationId"] },
       { name: "CareerStep_pkey", indisunique: true, indimmediate: true, columns: ["id"] },
     ]);
+  });
+});
+
+describe("AlumniTimelineItem", () => {
+  async function timelineContext() {
+    const alumni = await insert("Alumni");
+    const degree = await insert("Degree", { alumniId: alumni.id, level: "BACHELOR", status: "COMPLETED" });
+    const careerStep = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "ENDED" });
+    return { alumni, degree, careerStep };
+  }
+
+  it("contains only ordering information, references and technical fields", async () => {
+    const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'AlumniTimelineItem' ORDER BY ordinal_position");
+    expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt", "alumniId", "type", "position", "degreeId", "careerStepId"]);
+  });
+
+  it.each(["DEGREE", "CAREER_STEP"])("creates a valid %s item with a random UUID and required timestamps", async type => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const target: Values = type === "DEGREE" ? { degreeId: degree.id } : { careerStepId: careerStep.id };
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, ...target });
+    expect(item).toMatchObject({ alumniId: alumni.id, type, position: 1, degreeId: type === "DEGREE" ? degree.id : null, careerStepId: type === "CAREER_STEP" ? careerStep.id : null });
+    expect(item.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(item.createdAt).toBeInstanceOf(Date);
+    expect(item.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it.each(["DEGREE", "CAREER_STEP"])("enforces exactly one matching target for %s on insert and update", async type => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const degreeId = type === "DEGREE" ? degree.id : null;
+    const careerStepId = type === "CAREER_STEP" ? careerStep.id : null;
+    const oppositeType = type === "DEGREE" ? "CAREER_STEP" : "DEGREE";
+    const oppositeDegreeId = type === "CAREER_STEP" ? degree.id : null;
+    const oppositeCareerStepId = type === "DEGREE" ? careerStep.id : null;
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, degreeId, careerStepId });
+    for (const [invalidDegree, invalidCareerStep] of [[null, null], [degree.id, careerStep.id], [oppositeDegreeId, oppositeCareerStepId]]) {
+      await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "degreeId", "careerStepId") VALUES ($1, $2, 2, $3, $4)', [alumni.id, type, invalidDegree, invalidCareerStep], "23514", "AlumniTimelineItem_type_target");
+      await rejectsSql('UPDATE "AlumniTimelineItem" SET "degreeId" = $1, "careerStepId" = $2 WHERE id = $3', [invalidDegree, invalidCareerStep, item.id], "23514", "AlumniTimelineItem_type_target");
+    }
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET type = $1 WHERE id = $2', [oppositeType, item.id], "23514", "AlumniTimelineItem_type_target");
+    const updated = await db.query('UPDATE "AlumniTimelineItem" SET type = $1, "degreeId" = $2, "careerStepId" = $3 WHERE id = $4 RETURNING type', [oppositeType, oppositeDegreeId, oppositeCareerStepId, item.id]);
+    expect(updated.rows[0].type).toBe(oppositeType);
+  });
+
+  it("rejects invalid enum values on insert and update", async () => {
+    const { alumni, degree } = await timelineContext();
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "degreeId") VALUES ($1, $2, 2, $3)', [alumni.id, "INVALID", degree.id], "22P02");
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET type = $1 WHERE id = $2', ["INVALID", item.id], "22P02");
+  });
+
+  it.each(["alumniId", "type", "position"])("rejects omitted required %s", async column => {
+    const { alumni, degree } = await timelineContext();
+    const values: Values = { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id };
+    delete values[column];
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES ($1, $2, $3)`, entries.map(([, value]) => value), "23502");
+  });
+
+  it.each(["id", "createdAt", "updatedAt", "alumniId", "type", "position"])("rejects NULL required %s on insert and update", async column => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 1, careerStepId: careerStep.id });
+    const values: Values = { id: randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), alumniId: alumni.id, type: "DEGREE", position: 2, degreeId: degree.id, [column]: null };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "23502");
+    await rejectsSql(`UPDATE "AlumniTimelineItem" SET "${column}" = NULL WHERE id = $1`, [item.id], "23502");
+  });
+
+  it.each(["id", "alumniId", "degreeId", "careerStepId"])("rejects invalid UUID %s on insert and update", async column => {
+    const { alumni, degree } = await timelineContext();
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    const values: Values = { alumniId: alumni.id, type: "DEGREE", position: 2, degreeId: degree.id, [column]: "invalid" };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "22P02");
+    await rejectsSql(`UPDATE "AlumniTimelineItem" SET "${column}" = $1 WHERE id = $2`, ["invalid", item.id], "22P02");
+  });
+
+  it("rejects a missing Alumni reference on insert and update", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 1, careerStepId: careerStep.id });
+    await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "degreeId") VALUES ($1, $2, 2, $3)', [randomUUID(), "DEGREE", degree.id], "23503");
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET "alumniId" = $1 WHERE id = $2', [randomUUID(), item.id], "23503");
+  });
+
+  it.each([["DEGREE", "degreeId", "degree"], ["CAREER_STEP", "careerStepId", "careerStep"]])("rejects another Alumni's %s on insert, target update and owner update", async (type, column, station) => {
+    const own = await timelineContext();
+    const other = await timelineContext();
+    const ownId = station === "degree" ? own.degree.id : own.careerStep.id;
+    const otherId = station === "degree" ? other.degree.id : other.careerStep.id;
+    const constraint = `AlumniTimelineItem_alumniId_${column}_fkey`;
+    const item = await insert("AlumniTimelineItem", { alumniId: own.alumni.id, type, position: 1, [column]: ownId });
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "${column}") VALUES ($1, $2, 2, $3)`, [own.alumni.id, type, otherId], "23503", constraint);
+    await rejectsSql(`UPDATE "AlumniTimelineItem" SET "${column}" = $1 WHERE id = $2`, [otherId, item.id], "23503", constraint);
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET "alumniId" = $1 WHERE id = $2', [other.alumni.id, item.id], "23503", constraint);
+  });
+
+  it.each([["DEGREE", "degreeId"], ["CAREER_STEP", "careerStepId"]])("rejects unknown %s references on insert and update", async (type, column) => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const targetId = type === "DEGREE" ? degree.id : careerStep.id;
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, [column]: targetId });
+    const constraint = `AlumniTimelineItem_alumniId_${column}_fkey`;
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "${column}") VALUES ($1, $2, 2, $3)`, [alumni.id, type, randomUUID()], "23503", constraint);
+    await rejectsSql(`UPDATE "AlumniTimelineItem" SET "${column}" = $1 WHERE id = $2`, [randomUUID(), item.id], "23503", constraint);
+  });
+
+  it("requires positive integer positions on insert and update", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 1, careerStepId: careerStep.id });
+    for (const position of [0, -1]) {
+      await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "degreeId") VALUES ($1, $2, $3, $4)', [alumni.id, "DEGREE", position, degree.id], "23514", "AlumniTimelineItem_position_positive");
+      await rejectsSql('UPDATE "AlumniTimelineItem" SET position = $1 WHERE id = $2', [position, item.id], "23514", "AlumniTimelineItem_position_positive");
+    }
+    await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "degreeId") VALUES ($1, $2, $3, $4)', [alumni.id, "DEGREE", "1.5", degree.id], "22P02");
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET position = $1 WHERE id = $2', ["1.5", item.id], "22P02");
+  });
+
+  it("enforces immediate unique positions per Alumni on insert and update", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    await rejectsSql('INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "careerStepId") VALUES ($1, $2, 1, $3)', [alumni.id, "CAREER_STEP", careerStep.id], "23505", "AlumniTimelineItem_alumniId_position_key");
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 2, careerStepId: careerStep.id });
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET position = 1 WHERE id = $1', [item.id], "23505", "AlumniTimelineItem_alumniId_position_key");
+  });
+
+  it.each([["DEGREE", "degreeId"], ["CAREER_STEP", "careerStepId"]])("permits each %s target only once on insert and update", async (type, column) => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const firstId = type === "DEGREE" ? degree.id : careerStep.id;
+    const second = type === "DEGREE"
+      ? await insert("Degree", { alumniId: alumni.id, level: "MASTER", status: "COMPLETED" })
+      : await insert("CareerStep", { alumniId: alumni.id, type: "VOLUNTEERING", temporalStatus: "UNKNOWN" });
+    await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, [column]: firstId });
+    await rejectsSql(`INSERT INTO "AlumniTimelineItem" ("alumniId", type, position, "${column}") VALUES ($1, $2, 2, $3)`, [alumni.id, type, firstId], "23505", `AlumniTimelineItem_${column}_key`);
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 2, [column]: second.id });
+    await rejectsSql(`UPDATE "AlumniTimelineItem" SET "${column}" = $1 WHERE id = $2`, [firstId, item.id], "23505", `AlumniTimelineItem_${column}_key`);
+  });
+
+  it("allows gaps, independent positions, overlapping stations and multiple NULL targets", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    await db.query('UPDATE "Degree" SET "startYear" = 2020, "endYear" = 2024 WHERE id = $1', [degree.id]);
+    await db.query('UPDATE "CareerStep" SET "startYear" = 2020, "endYear" = 2024 WHERE id = $1', [careerStep.id]);
+    const anotherDegree = await insert("Degree", { alumniId: alumni.id, level: "MASTER", status: "COMPLETED", startYear: 2022, endYear: 2024 });
+    const anotherStep = await insert("CareerStep", { alumniId: alumni.id, type: "VOLUNTEERING", temporalStatus: "ONGOING", startYear: 2022 });
+    for (const [position, type, column, id] of [[1, "DEGREE", "degreeId", degree.id], [4, "CAREER_STEP", "careerStepId", careerStep.id], [9, "DEGREE", "degreeId", anotherDegree.id], [12, "CAREER_STEP", "careerStepId", anotherStep.id]] as const) {
+      await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position, [column]: id });
+    }
+    const other = await timelineContext();
+    await insert("AlumniTimelineItem", { alumniId: other.alumni.id, type: "DEGREE", position: 1, degreeId: other.degree.id });
+    const positions = await db.query('SELECT position FROM "AlumniTimelineItem" WHERE "alumniId" = $1 ORDER BY position', [alumni.id]);
+    expect(positions.rows.map(row => row.position)).toEqual([1, 4, 9, 12]);
+  });
+
+  it("reorders atomically through a free positive position while keeping uniqueness immediate", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const first = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    const second = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 2, careerStepId: careerStep.id });
+    // The test already runs inside one transaction; all intermediate states are valid.
+    await db.query('UPDATE "AlumniTimelineItem" SET position = 3, "updatedAt" = now() WHERE id = $1', [first.id]);
+    await db.query('UPDATE "AlumniTimelineItem" SET position = 1, "updatedAt" = now() WHERE id = $1', [second.id]);
+    await db.query('UPDATE "AlumniTimelineItem" SET position = 2, "updatedAt" = now() WHERE id = $1', [first.id]);
+    expect((await db.query('SELECT id, position FROM "AlumniTimelineItem" WHERE "alumniId" = $1 ORDER BY position', [alumni.id])).rows).toEqual([{ id: second.id, position: 1 }, { id: first.id, position: 2 }]);
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET position = 2 WHERE id = $1', [second.id], "23505", "AlumniTimelineItem_alumniId_position_key");
+  });
+
+  it.each([["Degree", "DEGREE", "degreeId"], ["CareerStep", "CAREER_STEP", "careerStepId"]])("deleting an unprotected %s removes its TimelineItem only", async (table, type, column) => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const targetId = table === "Degree" ? degree.id : careerStep.id;
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, [column]: targetId });
+    const otherType = type === "DEGREE" ? "CAREER_STEP" : "DEGREE";
+    const otherColumn = column === "degreeId" ? "careerStepId" : "degreeId";
+    const otherId = table === "Degree" ? careerStep.id : degree.id;
+    const retained = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: otherType, position: 2, [otherColumn]: otherId });
+    await db.query(`DELETE FROM "${table}" WHERE id = $1`, [targetId]);
+    expect((await db.query('SELECT id FROM "AlumniTimelineItem" WHERE "alumniId" = $1', [alumni.id])).rows).toEqual([{ id: retained.id }]);
+    expect((await db.query('SELECT id FROM "AlumniTimelineItem" WHERE id = $1', [item.id])).rows).toEqual([]);
+    expect((await db.query('SELECT id FROM "Alumni" WHERE id = $1', [alumni.id])).rows).toEqual([{ id: alumni.id }]);
+  });
+
+  it.each([["Degree", "DEGREE", "degreeId"], ["CareerStep", "CAREER_STEP", "careerStepId"]])("deleting a TimelineItem retains its %s", async (table, type, column) => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const targetId = table === "Degree" ? degree.id : careerStep.id;
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, [column]: targetId });
+    await db.query('DELETE FROM "AlumniTimelineItem" WHERE id = $1', [item.id]);
+    expect((await db.query(`SELECT id FROM "${table}" WHERE id = $1`, [targetId])).rows).toEqual([{ id: targetId }]);
+  });
+
+  it("cascades Alumni deletion to its TimelineItems and stations, retaining another Alumni's timeline", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 2, careerStepId: careerStep.id });
+    const other = await timelineContext();
+    const retained = await insert("AlumniTimelineItem", { alumniId: other.alumni.id, type: "DEGREE", position: 1, degreeId: other.degree.id });
+    await db.query('DELETE FROM "Alumni" WHERE id = $1', [alumni.id]);
+    expect((await db.query('SELECT id FROM "AlumniTimelineItem"')).rows).toEqual([{ id: retained.id }]);
+    for (const table of ["Degree", "CareerStep"]) expect((await db.query(`SELECT id FROM "${table}" WHERE "alumniId" = $1`, [alumni.id])).rows).toEqual([]);
+  });
+
+  it("preserves SurveyResponse Degree protection and the profile deletion workflow", async () => {
+    const { alumni, degree, survey } = await context();
+    const response = await insert("SurveyResponse", { alumniId: alumni.id, surveyId: survey.id, referenceDegreeId: degree.id, confirmedAt: new Date().toISOString() });
+    const item = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    await rejectsSql('DELETE FROM "Degree" WHERE id = $1', [degree.id], "23503", "SurveyResponse_alumniId_referenceDegreeId_fkey");
+    expect((await db.query('SELECT id FROM "AlumniTimelineItem" WHERE id = $1', [item.id])).rows).toEqual([{ id: item.id }]);
+    expect((await db.query('SELECT id FROM "SurveyResponse" WHERE id = $1', [response.id])).rows).toEqual([{ id: response.id }]);
+    await db.query('DELETE FROM "SurveyResponse" WHERE id = $1', [response.id]);
+    await db.query('DELETE FROM "Alumni" WHERE id = $1', [alumni.id]);
+    expect((await db.query('SELECT id FROM "AlumniTimelineItem" WHERE id = $1', [item.id])).rows).toEqual([]);
+    expect((await db.query('SELECT id FROM "Degree" WHERE id = $1', [degree.id])).rows).toEqual([]);
+  });
+
+  it.each([["Degree", "DEGREE", "degreeId"], ["CareerStep", "CAREER_STEP", "careerStepId"]])("prevents referenced %s key and owner updates", async (table, type, column) => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const other = await insert("Alumni");
+    const targetId = table === "Degree" ? degree.id : careerStep.id;
+    await insert("AlumniTimelineItem", { alumniId: alumni.id, type, position: 1, [column]: targetId });
+    const constraint = `AlumniTimelineItem_alumniId_${column}_fkey`;
+    await rejectsSql(`UPDATE "${table}" SET id = $1 WHERE id = $2`, [randomUUID(), targetId], "23503", constraint);
+    await rejectsSql(`UPDATE "${table}" SET "alumniId" = $1 WHERE id = $2`, [other.id, targetId], "23503", constraint);
+    await rejectsSql('UPDATE "Alumni" SET id = $1 WHERE id = $2', [randomUUID(), alumni.id], "23503");
+  });
+
+  it("enforces primary key uniqueness independently of position and station", async () => {
+    const { alumni, degree, careerStep } = await timelineContext();
+    const first = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    await rejectsSql('INSERT INTO "AlumniTimelineItem" (id, "alumniId", type, position, "careerStepId") VALUES ($1, $2, $3, 2, $4)', [first.id, alumni.id, "CAREER_STEP", careerStep.id], "23505", "AlumniTimelineItem_pkey");
+    const second = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 2, careerStepId: careerStep.id });
+    expect(second.id).not.toBe(first.id);
+    await rejectsSql('UPDATE "AlumniTimelineItem" SET id = $1 WHERE id = $2', [first.id, second.id], "23505", "AlumniTimelineItem_pkey");
+  });
+
+  it("uses immediate MATCH SIMPLE ownership FKs, two CHECKs and only the required unique indexes", async () => {
+    const fks = await db.query("SELECT conname, confrelid::regclass::text AS target, confmatchtype, confdeltype, confupdtype, condeferrable, condeferred, ARRAY(SELECT a.attname::text FROM unnest(conkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = conrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns, ARRAY(SELECT a.attname::text FROM unnest(confkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = confrelid AND a.attnum = k.attnum ORDER BY k.position) AS references FROM pg_constraint WHERE conrelid = '\"AlumniTimelineItem\"'::regclass AND contype = 'f' ORDER BY conname");
+    expect(fks.rows).toEqual([
+      { conname: "AlumniTimelineItem_alumniId_careerStepId_fkey", target: '\"CareerStep\"', confmatchtype: "s", confdeltype: "c", confupdtype: "a", condeferrable: false, condeferred: false, columns: ["alumniId", "careerStepId"], references: ["alumniId", "id"] },
+      { conname: "AlumniTimelineItem_alumniId_degreeId_fkey", target: '\"Degree\"', confmatchtype: "s", confdeltype: "c", confupdtype: "a", condeferrable: false, condeferred: false, columns: ["alumniId", "degreeId"], references: ["alumniId", "id"] },
+      { conname: "AlumniTimelineItem_alumniId_fkey", target: '\"Alumni\"', confmatchtype: "s", confdeltype: "c", confupdtype: "a", condeferrable: false, condeferred: false, columns: ["alumniId"], references: ["id"] },
+    ]);
+    const checks = await db.query("SELECT conname, convalidated FROM pg_constraint WHERE conrelid = '\"AlumniTimelineItem\"'::regclass AND contype = 'c' ORDER BY conname");
+    expect(checks.rows).toEqual([{ conname: "AlumniTimelineItem_position_positive", convalidated: true }, { conname: "AlumniTimelineItem_type_target", convalidated: true }]);
+    const indexes = await db.query("SELECT c.relname AS name, i.indisunique, i.indimmediate, i.indnullsnotdistinct, ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indrelid = '\"AlumniTimelineItem\"'::regclass ORDER BY c.relname");
+    expect(indexes.rows).toEqual([
+      { name: "AlumniTimelineItem_alumniId_position_key", indisunique: true, indimmediate: true, indnullsnotdistinct: false, columns: ["alumniId", "position"] },
+      { name: "AlumniTimelineItem_careerStepId_key", indisunique: true, indimmediate: true, indnullsnotdistinct: false, columns: ["careerStepId"] },
+      { name: "AlumniTimelineItem_degreeId_key", indisunique: true, indimmediate: true, indnullsnotdistinct: false, columns: ["degreeId"] },
+      { name: "AlumniTimelineItem_pkey", indisunique: true, indimmediate: true, indnullsnotdistinct: false, columns: ["id"] },
+    ]);
+    const ownerKeys = await db.query("SELECT c.relname AS name, i.indimmediate, ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indisunique AND c.relname IN ('Degree_alumniId_id_key', 'CareerStep_alumniId_id_key') ORDER BY c.relname");
+    expect(ownerKeys.rows).toEqual([{ name: "CareerStep_alumniId_id_key", indimmediate: true, columns: ["alumniId", "id"] }, { name: "Degree_alumniId_id_key", indimmediate: true, columns: ["alumniId", "id"] }]);
   });
 });
 
