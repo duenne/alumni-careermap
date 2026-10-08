@@ -40,6 +40,15 @@ model Institution {
   degrees  Degree[]
 }
 
+model Organisation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  name      String
+  location  String?
+  sector    String?
+}
+
 model Program {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt     DateTime @default(now()) @db.Timestamptz(3)

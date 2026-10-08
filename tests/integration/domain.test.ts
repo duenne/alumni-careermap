@@ -42,10 +42,10 @@ beforeEach(async () => { db = await pool.connect(); await db.query("BEGIN"); });
 afterEach(async () => { await db.query("ROLLBACK"); db.release(); });
 afterAll(async () => { await pool.end(); });
 
-describe("Phase A database contract", () => {
-  it("contains only six domain tables and pseudonymized Alumni columns", async () => {
+describe("Phase A and B.1 database contract", () => {
+  it("contains only seven domain tables and pseudonymized Alumni columns", async () => {
     const tables = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename");
-    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "Degree", "Institution", "Program", "Survey", "SurveyResponse"]);
+    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
     const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Alumni' ORDER BY ordinal_position");
     expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt"]);
   });
@@ -53,13 +53,14 @@ describe("Phase A database contract", () => {
   it("uses UUID PKs, required UTC-capable timestamps, and no custom triggers", async () => {
     const { institution, program, survey, alumni, degree } = await context();
     const response = await insert("SurveyResponse", { surveyId: survey.id, alumniId: alumni.id, referenceDegreeId: degree.id, confirmedAt: new Date().toISOString() });
-    for (const row of [institution, program, survey, alumni, degree, response]) {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    for (const row of [institution, program, survey, alumni, degree, response, organisation]) {
       expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(row.createdAt).toBeInstanceOf(Date);
       expect(row.updatedAt).toBeInstanceOf(Date);
     }
     const columns = await db.query("SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND column_name IN ('createdAt', 'updatedAt', 'confirmedAt')");
-    expect(columns.rows).toHaveLength(13);
+    expect(columns.rows).toHaveLength(15);
     for (const row of columns.rows) expect(row).toEqual({ data_type: "timestamp with time zone", is_nullable: "NO" });
     const triggers = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)");
     expect(triggers.rows).toEqual([]);
@@ -88,6 +89,80 @@ describe("Phase A database contract", () => {
     else if (table === "Institution") await insert("Institution", { name: "Institution B" });
     else return;
     await rejectsSql(`UPDATE "${table}" SET id = $1 WHERE id <> $1`, [second.rows[0].id], "23505");
+  });
+});
+
+describe("Organisation", () => {
+  it("contains only the normative fields and no placeholder records", async () => {
+    const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Organisation' ORDER BY ordinal_position");
+    expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt", "name", "location", "sector"]);
+    expect((await db.query('SELECT * FROM "Organisation"')).rows).toEqual([]);
+  });
+
+  it("creates with only a name, generating a UUID and required timestamps", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    expect(organisation).toMatchObject({ name: "Organisation A", location: null, sector: null });
+    expect(organisation.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(organisation.createdAt).toBeInstanceOf(Date);
+    expect(organisation.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("creates with all optional fields", async () => {
+    const values = { name: "Organisation A", location: "Location A", sector: "Sector A" };
+    expect(await insert("Organisation", values)).toMatchObject(values);
+  });
+
+  it("rejects a missing name", async () => {
+    await rejectsSql('INSERT INTO "Organisation" DEFAULT VALUES', [], "23502");
+  });
+
+  it.each(["name", "location", "sector"])("rejects empty and whitespace-only %s on insert and update", async column => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    for (const value of ["", " ", "\t\r\n", " \t\n"]) {
+      const values = column === "name" ? [value] : ["Organisation B", value];
+      const columns = column === "name" ? '"name"' : `"name", "${column}"`;
+      const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");
+      await rejectsSql(`INSERT INTO "Organisation" (${columns}) VALUES (${placeholders})`, values, "23514", `Organisation_${column}_nonblank`);
+      await rejectsSql(`UPDATE "Organisation" SET "${column}" = $1 WHERE id = $2`, [value, organisation.id], "23514", `Organisation_${column}_nonblank`);
+    }
+  });
+
+  it("accepts explicit NULL optional fields on insert and update", async () => {
+    expect(await insert("Organisation", { name: "Organisation A", location: null, sector: null })).toMatchObject({ location: null, sector: null });
+    const organisation = await insert("Organisation", { name: "Organisation B", location: "Location A", sector: "Sector A" });
+    const updated = await db.query('UPDATE "Organisation" SET location = NULL, sector = NULL WHERE id = $1 RETURNING *', [organisation.id]);
+    expect(updated.rows[0]).toMatchObject({ location: null, sector: null });
+  });
+
+  it("accepts duplicate names and identical name/location combinations on insert and update", async () => {
+    const values = { name: "Organisation A", location: "Location A", sector: "Sector A" };
+    const first = await insert("Organisation", values);
+    const duplicate = await insert("Organisation", values);
+    expect(duplicate.id).not.toBe(first.id);
+    await insert("Organisation", { name: values.name, location: "Location B" });
+    await insert("Organisation", { name: values.name });
+    await insert("Organisation", { name: values.name });
+    const other = await insert("Organisation", { name: "Organisation B", location: "Location B" });
+    const updated = await db.query('UPDATE "Organisation" SET name = $1, location = $2, sector = $3 WHERE id = $4 RETURNING *', [values.name, values.location, values.sector, other.id]);
+    expect(updated.rows[0]).toMatchObject(values);
+  });
+
+  it("enforces its UUID primary key", async () => {
+    const first = await insert("Organisation", { name: "Organisation A" });
+    const second = await insert("Organisation", { name: "Organisation B" });
+    await rejectsSql('INSERT INTO "Organisation" (id, name) VALUES ($1, $2)', [first.id, "Organisation C"], "23505", "Organisation_pkey");
+    await rejectsSql('UPDATE "Organisation" SET id = $1 WHERE id = $2', [first.id, second.id], "23505", "Organisation_pkey");
+    await rejectsSql('INSERT INTO "Organisation" (id, name) VALUES ($1, $2)', ["invalid", "Organisation C"], "22P02");
+    await rejectsSql('UPDATE "Organisation" SET id = $1 WHERE id = $2', ["invalid", first.id], "22P02");
+  });
+
+  it.each(["id", "createdAt", "updatedAt", "name"])("rejects NULL required %s on insert and update", async column => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const columns = column === "name" ? '"name"' : `"name", "${column}"`;
+    const values = column === "name" ? [null] : ["Organisation B", null];
+    const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");
+    await rejectsSql(`INSERT INTO "Organisation" (${columns}) VALUES (${placeholders})`, values, "23502");
+    await rejectsSql(`UPDATE "Organisation" SET "${column}" = NULL WHERE id = $1`, [organisation.id], "23502");
   });
 });
 
