@@ -29,6 +29,23 @@ enum DegreeStatus {
   UNKNOWN
 }
 
+enum CareerStepType {
+  EMPLOYMENT
+  INTERNSHIP
+  EDUCATION
+  VOCATIONAL_TRAINING
+  VOLUNTEERING
+  SELF_EMPLOYMENT
+  UNEMPLOYED
+  OTHER
+}
+
+enum CareerStepTemporalStatus {
+  ONGOING
+  ENDED
+  UNKNOWN
+}
+
 model Institution {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -47,6 +64,8 @@ model Organisation {
   name      String
   location  String?
   sector    String?
+
+  careerSteps CareerStep[]
 }
 
 model Program {
@@ -84,8 +103,9 @@ model Alumni {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
-  degrees   Degree[]
-  responses SurveyResponse[]
+  degrees     Degree[]
+  responses   SurveyResponse[]
+  careerSteps CareerStep[]
 }
 
 model Degree {
@@ -111,6 +131,28 @@ model Degree {
   @@unique([alumniId, id])
   @@index([programId])
   @@index([institutionId])
+}
+
+model CareerStep {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId       String                   @db.Uuid
+  type           CareerStepType
+  temporalStatus CareerStepTemporalStatus
+  organisationId String?                  @db.Uuid
+  roleTitle      String?
+  roleCategory   String?
+  functionArea   String?
+  location       String?
+  startYear      Int?
+  endYear        Int?
+
+  alumni       Alumni        @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organisation Organisation? @relation(fields: [organisationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([alumniId, id])
+  @@index([organisationId])
 }
 
 model SurveyResponse {

@@ -42,10 +42,10 @@ beforeEach(async () => { db = await pool.connect(); await db.query("BEGIN"); });
 afterEach(async () => { await db.query("ROLLBACK"); db.release(); });
 afterAll(async () => { await pool.end(); });
 
-describe("Phase A and B.1 database contract", () => {
-  it("contains only seven domain tables and pseudonymized Alumni columns", async () => {
+describe("Phase A through B.2 database contract", () => {
+  it("contains only eight domain tables and pseudonymized Alumni columns", async () => {
     const tables = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename");
-    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
+    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "CareerStep", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
     const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Alumni' ORDER BY ordinal_position");
     expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt"]);
   });
@@ -54,13 +54,14 @@ describe("Phase A and B.1 database contract", () => {
     const { institution, program, survey, alumni, degree } = await context();
     const response = await insert("SurveyResponse", { surveyId: survey.id, alumniId: alumni.id, referenceDegreeId: degree.id, confirmedAt: new Date().toISOString() });
     const organisation = await insert("Organisation", { name: "Organisation A" });
-    for (const row of [institution, program, survey, alumni, degree, response, organisation]) {
+    const careerStep = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" });
+    for (const row of [institution, program, survey, alumni, degree, response, organisation, careerStep]) {
       expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(row.createdAt).toBeInstanceOf(Date);
       expect(row.updatedAt).toBeInstanceOf(Date);
     }
     const columns = await db.query("SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND column_name IN ('createdAt', 'updatedAt', 'confirmedAt')");
-    expect(columns.rows).toHaveLength(15);
+    expect(columns.rows).toHaveLength(17);
     for (const row of columns.rows) expect(row).toEqual({ data_type: "timestamp with time zone", is_nullable: "NO" });
     const triggers = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)");
     expect(triggers.rows).toEqual([]);
@@ -71,6 +72,8 @@ describe("Phase A and B.1 database contract", () => {
       SurveyStatus: ["DRAFT", "OPEN", "CLOSED"],
       DegreeLevel: ["BACHELOR", "MASTER", "PHD", "DIPLOMA", "CERTIFICATE", "OTHER"],
       DegreeStatus: ["IN_PROGRESS", "COMPLETED", "ENDED_WITHOUT_DEGREE", "UNKNOWN"],
+      CareerStepType: ["EMPLOYMENT", "INTERNSHIP", "EDUCATION", "VOCATIONAL_TRAINING", "VOLUNTEERING", "SELF_EMPLOYMENT", "UNEMPLOYED", "OTHER"],
+      CareerStepTemporalStatus: ["ONGOING", "ENDED", "UNKNOWN"],
     })) {
       const result = await db.query("SELECT enumlabel FROM pg_enum WHERE enumtypid = $1::regtype ORDER BY enumsortorder", [`"${type}"`]);
       expect(result.rows.map(row => row.enumlabel)).toEqual(labels);
@@ -261,6 +264,227 @@ describe("Degree", () => {
   it.each(["title", "fieldOfStudy"])("rejects blank optional %s", async column => {
     await context();
     await rejectsSql(`UPDATE "Degree" SET "${column}" = $1`, [" \t\n"], "23514");
+  });
+});
+
+describe("CareerStep", () => {
+  async function careerContext(values: Values = {}) {
+    const alumni = await insert("Alumni");
+    const step = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN", ...values });
+    return { alumni, step };
+  }
+
+  it("contains only the normative fields", async () => {
+    const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'CareerStep' ORDER BY ordinal_position");
+    expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt", "alumniId", "type", "temporalStatus", "organisationId", "roleTitle", "roleCategory", "functionArea", "location", "startYear", "endYear"]);
+  });
+
+  it("creates a minimal step with a random UUID, timestamps and NULL optional fields", async () => {
+    const { alumni, step } = await careerContext();
+    expect(step).toMatchObject({ alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN", organisationId: null, roleTitle: null, roleCategory: null, functionArea: null, location: null, startYear: null, endYear: null });
+    expect(step.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(step.createdAt).toBeInstanceOf(Date);
+    expect(step.updatedAt).toBeInstanceOf(Date);
+    const second = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" });
+    expect(second.id).not.toBe(step.id);
+    expect(second.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("creates with every optional field", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const values = { organisationId: organisation.id, roleTitle: "Technical coordinator", roleCategory: "Category A", functionArea: "Function A", location: "Location A", startYear: 2020, endYear: 2024, temporalStatus: "ENDED" };
+    expect((await careerContext(values)).step).toMatchObject(values);
+  });
+
+  it("accepts explicit NULL for every optional field on insert and update", async () => {
+    const values = { organisationId: null, roleTitle: null, roleCategory: null, functionArea: null, location: null, startYear: null, endYear: null };
+    expect((await careerContext(values)).step).toMatchObject(values);
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const { step } = await careerContext({ organisationId: organisation.id, roleTitle: "Technical coordinator", roleCategory: "Category A", functionArea: "Function A", location: "Location A", startYear: 2020, endYear: 2024, temporalStatus: "ENDED" });
+    const updated = await db.query('UPDATE "CareerStep" SET "organisationId" = NULL, "roleTitle" = NULL, "roleCategory" = NULL, "functionArea" = NULL, location = NULL, "startYear" = NULL, "endYear" = NULL WHERE id = $1 RETURNING *', [step.id]);
+    expect(updated.rows[0]).toMatchObject(values);
+  });
+
+  it.each(["EMPLOYMENT", "INTERNSHIP", "EDUCATION", "VOCATIONAL_TRAINING", "VOLUNTEERING", "SELF_EMPLOYMENT", "UNEMPLOYED", "OTHER"])("accepts type %s on insert and update", async type => {
+    const { step } = await careerContext({ type, ...(type === "OTHER" ? { roleTitle: "Independent technical project" } : {}) });
+    expect(step.type).toBe(type);
+    const updated = await db.query('UPDATE "CareerStep" SET type = $1, "roleTitle" = $2 WHERE id = $3 RETURNING type', [type, "Independent technical project", step.id]);
+    expect(updated.rows[0].type).toBe(type);
+  });
+
+  it.each(["ONGOING", "ENDED", "UNKNOWN"])("accepts temporal status %s without an end year on insert and update", async temporalStatus => {
+    const { step } = await careerContext({ temporalStatus });
+    expect(step).toMatchObject({ temporalStatus, endYear: null });
+    const updated = await db.query('UPDATE "CareerStep" SET "temporalStatus" = $1 WHERE id = $2 RETURNING "temporalStatus"', [temporalStatus, step.id]);
+    expect(updated.rows[0].temporalStatus).toBe(temporalStatus);
+  });
+
+  it.each(["type", "temporalStatus"])("rejects invalid enum values for %s on insert and update", async column => {
+    const { alumni, step } = await careerContext();
+    const type = column === "type" ? "INVALID" : "EMPLOYMENT";
+    const temporalStatus = column === "temporalStatus" ? "INVALID" : "UNKNOWN";
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus") VALUES ($1, $2, $3)', [alumni.id, type, temporalStatus], "22P02");
+    await rejectsSql(`UPDATE "CareerStep" SET "${column}" = $1 WHERE id = $2`, ["INVALID", step.id], "22P02");
+  });
+
+  it.each(["alumniId", "type", "temporalStatus"])("rejects omitted required %s", async column => {
+    const alumni = await insert("Alumni");
+    const values: Values = { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" };
+    delete values[column];
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "CareerStep" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES ($1, $2)`, entries.map(([, value]) => value), "23502");
+  });
+
+  it.each(["id", "createdAt", "updatedAt", "alumniId", "type", "temporalStatus"])("rejects NULL required %s on insert and update", async column => {
+    const { alumni, step } = await careerContext();
+    const values: Values = { id: randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN", [column]: null };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "CareerStep" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "23502");
+    await rejectsSql(`UPDATE "CareerStep" SET "${column}" = NULL WHERE id = $1`, [step.id], "23502");
+  });
+
+  it.each(["id", "alumniId", "organisationId"])("rejects invalid UUID %s on insert and update", async column => {
+    const { alumni, step } = await careerContext();
+    const values: Values = { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN", [column]: "invalid" };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "CareerStep" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "22P02");
+    await rejectsSql(`UPDATE "CareerStep" SET "${column}" = $1 WHERE id = $2`, ["invalid", step.id], "22P02");
+  });
+
+  it("requires a real Alumni owner on insert and update", async () => {
+    const { step } = await careerContext();
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus") VALUES ($1, $2, $3)', [randomUUID(), "EMPLOYMENT", "UNKNOWN"], "23503", "CareerStep_alumniId_fkey");
+    await rejectsSql('UPDATE "CareerStep" SET "alumniId" = $1 WHERE id = $2', [randomUUID(), step.id], "23503", "CareerStep_alumniId_fkey");
+  });
+
+  it("requires a real Organisation when provided on insert and update", async () => {
+    const { alumni, step } = await careerContext();
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "organisationId") VALUES ($1, $2, $3, $4)', [alumni.id, "EMPLOYMENT", "UNKNOWN", randomUUID()], "23503", "CareerStep_organisationId_fkey");
+    await rejectsSql('UPDATE "CareerStep" SET "organisationId" = $1 WHERE id = $2', [randomUUID(), step.id], "23503", "CareerStep_organisationId_fkey");
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const updated = await db.query('UPDATE "CareerStep" SET "organisationId" = $1 WHERE id = $2 RETURNING "organisationId"', [organisation.id, step.id]);
+    expect(updated.rows[0].organisationId).toBe(organisation.id);
+  });
+
+  it("protects referenced Organisations and permits deletion when unreferenced", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const unused = await insert("Organisation", { name: "Organisation B" });
+    const { alumni, step } = await careerContext({ organisationId: organisation.id });
+    const second = await insert("CareerStep", { alumniId: alumni.id, type: "INTERNSHIP", temporalStatus: "ENDED", organisationId: organisation.id });
+    await db.query('DELETE FROM "Organisation" WHERE id = $1', [unused.id]);
+    expect((await db.query('SELECT * FROM "Organisation" WHERE id = $1', [unused.id])).rows).toEqual([]);
+    await rejectsSql('DELETE FROM "Organisation" WHERE id = $1', [organisation.id], "23503", "CareerStep_organisationId_fkey");
+    await db.query('DELETE FROM "CareerStep" WHERE id = $1', [step.id]);
+    await rejectsSql('DELETE FROM "Organisation" WHERE id = $1', [organisation.id], "23503", "CareerStep_organisationId_fkey");
+    await db.query('UPDATE "CareerStep" SET "organisationId" = NULL WHERE id = $1', [second.id]);
+    await db.query('DELETE FROM "Organisation" WHERE id = $1', [organisation.id]);
+    expect((await db.query('SELECT * FROM "Organisation" WHERE id = $1', [organisation.id])).rows).toEqual([]);
+    expect((await db.query('SELECT id FROM "CareerStep" WHERE id = $1', [second.id])).rows).toEqual([{ id: second.id }]);
+  });
+
+  it("does not delete Alumni or Organisation when deleting a CareerStep", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const { alumni, step } = await careerContext({ organisationId: organisation.id });
+    await db.query('DELETE FROM "CareerStep" WHERE id = $1', [step.id]);
+    expect((await db.query('SELECT id FROM "Alumni" WHERE id = $1', [alumni.id])).rows).toEqual([{ id: alumni.id }]);
+    expect((await db.query('SELECT id FROM "Organisation" WHERE id = $1', [organisation.id])).rows).toEqual([{ id: organisation.id }]);
+  });
+
+  it("cascades Alumni deletion only to its own CareerSteps, preserving Organisation", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const { alumni } = await careerContext({ organisationId: organisation.id });
+    await insert("CareerStep", { alumniId: alumni.id, type: "VOLUNTEERING", temporalStatus: "ONGOING" });
+    const other = await careerContext({ organisationId: organisation.id });
+    await db.query('DELETE FROM "Alumni" WHERE id = $1', [alumni.id]);
+    expect((await db.query('SELECT * FROM "CareerStep" WHERE "alumniId" = $1', [alumni.id])).rows).toEqual([]);
+    expect((await db.query('SELECT id FROM "CareerStep" WHERE id = $1', [other.step.id])).rows).toEqual([{ id: other.step.id }]);
+    expect((await db.query('SELECT id FROM "Organisation" WHERE id = $1', [organisation.id])).rows).toEqual([{ id: organisation.id }]);
+  });
+
+  it("uses real immediate foreign keys with NO ACTION key updates", async () => {
+    const organisation = await insert("Organisation", { name: "Organisation A" });
+    const { alumni, step } = await careerContext({ organisationId: organisation.id });
+    for (const [table, id, constraint] of [["Alumni", alumni.id, "CareerStep_alumniId_fkey"], ["Organisation", organisation.id, "CareerStep_organisationId_fkey"]]) {
+      await rejectsSql(`UPDATE "${table}" SET id = $1 WHERE id = $2`, [randomUUID(), id], "23503", constraint);
+    }
+    const fks = await db.query("SELECT conname, confdeltype, confupdtype, condeferrable, condeferred FROM pg_constraint WHERE conrelid = '\"CareerStep\"'::regclass AND contype = 'f' ORDER BY conname");
+    expect(fks.rows).toEqual([
+      { conname: "CareerStep_alumniId_fkey", confdeltype: "c", confupdtype: "a", condeferrable: false, condeferred: false },
+      { conname: "CareerStep_organisationId_fkey", confdeltype: "r", confupdtype: "a", condeferrable: false, condeferred: false },
+    ]);
+    expect((await db.query('SELECT "alumniId", "organisationId" FROM "CareerStep" WHERE id = $1', [step.id])).rows).toEqual([{ alumniId: alumni.id, organisationId: organisation.id }]);
+  });
+
+  it.each(["startYear", "endYear"])("bounds %s to 1..9999 on insert and update, allowing NULL", async column => {
+    const { alumni, step } = await careerContext({ temporalStatus: "ENDED" });
+    for (const value of [0, -1, 10000]) {
+      await rejectsSql(`INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "${column}") VALUES ($1, 'EMPLOYMENT', 'ENDED', $2)`, [alumni.id, value], "23514", `CareerStep_${column}_range`);
+      await rejectsSql(`UPDATE "CareerStep" SET "${column}" = $1 WHERE id = $2`, [value, step.id], "23514", `CareerStep_${column}_range`);
+    }
+    for (const value of [1, 9999, null]) {
+      await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "ENDED", [column]: value });
+      await db.query(`UPDATE "CareerStep" SET "${column}" = $1 WHERE id = $2`, [value, step.id]);
+    }
+  });
+
+  it("rejects reversed years on insert and update, allowing equal and incomplete years", async () => {
+    const { alumni, step } = await careerContext({ temporalStatus: "ENDED" });
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "startYear", "endYear") VALUES ($1, $2, $3, 2024, 2020)', [alumni.id, "EMPLOYMENT", "ENDED"], "23514", "CareerStep_year_order");
+    await rejectsSql('UPDATE "CareerStep" SET "startYear" = 2024, "endYear" = 2020 WHERE id = $1', [step.id], "23514", "CareerStep_year_order");
+    for (const values of [{ startYear: 2020, endYear: 2020 }, { startYear: 2020, endYear: null }, { startYear: null, endYear: 2020 }]) {
+      await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "ENDED", ...values });
+      await db.query('UPDATE "CareerStep" SET "startYear" = $1, "endYear" = $2 WHERE id = $3', [values.startYear, values.endYear, step.id]);
+    }
+  });
+
+  it.each(["ONGOING", "UNKNOWN"])("%s forbids a known end on insert, year update and status update", async temporalStatus => {
+    const { alumni, step } = await careerContext({ temporalStatus, startYear: 2020 });
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "endYear") VALUES ($1, $2, $3, 2024)', [alumni.id, "EMPLOYMENT", temporalStatus], "23514", "CareerStep_open_status_end");
+    await rejectsSql('UPDATE "CareerStep" SET "endYear" = 2024 WHERE id = $1', [step.id], "23514", "CareerStep_open_status_end");
+    const ended = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "ENDED", endYear: 2024 });
+    await rejectsSql('UPDATE "CareerStep" SET "temporalStatus" = $1 WHERE id = $2', [temporalStatus, ended.id], "23514", "CareerStep_open_status_end");
+  });
+
+  it.each(["roleTitle", "roleCategory", "functionArea", "location"])("rejects blank optional %s on insert and update", async column => {
+    const { alumni, step } = await careerContext();
+    for (const value of ["", " ", "\t\r\n", " \t\n"]) {
+      await rejectsSql(`INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "${column}") VALUES ($1, 'EMPLOYMENT', 'UNKNOWN', $2)`, [alumni.id, value], "23514", `CareerStep_${column}_nonblank`);
+      await rejectsSql(`UPDATE "CareerStep" SET "${column}" = $1 WHERE id = $2`, [value, step.id], "23514", `CareerStep_${column}_nonblank`);
+    }
+  });
+
+  it("requires a nonblank factual roleTitle for OTHER on insert and update", async () => {
+    const { alumni, step } = await careerContext();
+    await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus") VALUES ($1, $2, $3)', [alumni.id, "OTHER", "UNKNOWN"], "23514", "CareerStep_other_roleTitle");
+    for (const roleTitle of [null, "", " \t\n"]) {
+      await rejectsSql('INSERT INTO "CareerStep" ("alumniId", type, "temporalStatus", "roleTitle") VALUES ($1, $2, $3, $4)', [alumni.id, "OTHER", "UNKNOWN", roleTitle], "23514");
+    }
+    await rejectsSql('UPDATE "CareerStep" SET type = $1 WHERE id = $2', ["OTHER", step.id], "23514", "CareerStep_other_roleTitle");
+    const other = await insert("CareerStep", { alumniId: alumni.id, type: "OTHER", temporalStatus: "UNKNOWN", roleTitle: "Independent technical project" });
+    await rejectsSql('UPDATE "CareerStep" SET "roleTitle" = NULL WHERE id = $1', [other.id], "23514", "CareerStep_other_roleTitle");
+    const updated = await db.query('UPDATE "CareerStep" SET type = $1, "roleTitle" = $2 WHERE id = $3 RETURNING type, "roleTitle"', ["OTHER", "Independent technical project", step.id]);
+    expect(updated.rows[0]).toEqual({ type: "OTHER", roleTitle: "Independent technical project" });
+  });
+
+  it("allows multiple and overlapping activities for one Alumni, including duplicate facts", async () => {
+    const { alumni, step } = await careerContext({ temporalStatus: "ENDED", startYear: 2020, endYear: 2024 });
+    const duplicate = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "ENDED", startYear: 2020, endYear: 2024 });
+    expect(duplicate.id).not.toBe(step.id);
+    await insert("CareerStep", { alumniId: alumni.id, type: "VOLUNTEERING", temporalStatus: "ONGOING", startYear: 2022 });
+    expect((await db.query('SELECT id FROM "CareerStep" WHERE "alumniId" = $1', [alumni.id])).rows).toHaveLength(3);
+  });
+
+  it("enforces UUID PK uniqueness and an immediate composite owner-target unique index without redundant indexes", async () => {
+    const { alumni, step } = await careerContext();
+    const second = await insert("CareerStep", { alumniId: alumni.id, type: "INTERNSHIP", temporalStatus: "ENDED" });
+    await rejectsSql('INSERT INTO "CareerStep" (id, "alumniId", type, "temporalStatus") VALUES ($1, $2, $3, $4)', [step.id, alumni.id, "EMPLOYMENT", "UNKNOWN"], "23505");
+    await rejectsSql('UPDATE "CareerStep" SET id = $1 WHERE id = $2', [step.id, second.id], "23505");
+    const indexes = await db.query("SELECT c.relname AS name, i.indisunique, i.indimmediate, ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indrelid = '\"CareerStep\"'::regclass ORDER BY c.relname");
+    expect(indexes.rows).toEqual([
+      { name: "CareerStep_alumniId_id_key", indisunique: true, indimmediate: true, columns: ["alumniId", "id"] },
+      { name: "CareerStep_organisationId_idx", indisunique: false, indimmediate: true, columns: ["organisationId"] },
+      { name: "CareerStep_pkey", indisunique: true, indimmediate: true, columns: ["id"] },
+    ]);
   });
 });
 
