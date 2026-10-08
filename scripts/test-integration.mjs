@@ -47,6 +47,7 @@ try {
   if (!ready) throw new Error("PostgreSQL 17 did not become ready");
   const env = { ...process.env, DATABASE_URL: connectionString };
   run(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"], { env, stdio: "inherit" });
+  run(process.execPath, ["node_modules/prisma/build/index.js", "generate"], { env, stdio: "inherit" });
   run(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--config", "vitest.integration.config.ts"], { env, stdio: "inherit" });
 } catch (error) {
   console.error(error.message);
