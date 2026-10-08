@@ -24,4 +24,5 @@ jobs:
       - run: npm test
       - run: npm run db:validate
       - run: npm run test:integration
+      - run: npm run typecheck
       - run: npm run build

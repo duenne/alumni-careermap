@@ -29,6 +29,28 @@ enum DegreeStatus {
   UNKNOWN
 }
 
+enum CareerStepType {
+  EMPLOYMENT
+  INTERNSHIP
+  EDUCATION
+  VOCATIONAL_TRAINING
+  VOLUNTEERING
+  SELF_EMPLOYMENT
+  UNEMPLOYED
+  OTHER
+}
+
+enum CareerStepTemporalStatus {
+  ONGOING
+  ENDED
+  UNKNOWN
+}
+
+enum AlumniTimelineItemType {
+  DEGREE
+  CAREER_STEP
+}
+
 model Institution {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -38,6 +60,17 @@ model Institution {
 
   programs Program[]
   degrees  Degree[]
+}
+
+model Organisation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  name      String
+  location  String?
+  sector    String?
+
+  careerSteps CareerStep[]
 }
 
 model Program {
@@ -75,8 +108,11 @@ model Alumni {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
-  degrees   Degree[]
-  responses SurveyResponse[]
+  degrees       Degree[]
+  responses     SurveyResponse[]
+  careerSteps   CareerStep[]
+  timelineItems AlumniTimelineItem[]
+  contact       AlumniContact?
 }
 
 model Degree {
@@ -98,10 +134,53 @@ model Degree {
   program            Program?         @relation(fields: [programId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   institution        Institution?     @relation(fields: [institutionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   referenceResponses SurveyResponse[]
+  timelineItems      AlumniTimelineItem[]
 
   @@unique([alumniId, id])
   @@index([programId])
   @@index([institutionId])
+}
+
+model CareerStep {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId       String                   @db.Uuid
+  type           CareerStepType
+  temporalStatus CareerStepTemporalStatus
+  organisationId String?                  @db.Uuid
+  roleTitle      String?
+  roleCategory   String?
+  functionArea   String?
+  location       String?
+  startYear      Int?
+  endYear        Int?
+
+  alumni        Alumni        @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organisation  Organisation? @relation(fields: [organisationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  timelineItems AlumniTimelineItem[]
+
+  @@unique([alumniId, id])
+  @@index([organisationId])
+}
+
+model AlumniTimelineItem {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt    DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId     String                 @db.Uuid
+  type         AlumniTimelineItemType
+  position     Int
+  // Target uniqueness enforces one item per station; Prisma uses inverse lists
+  // for the composite ownership relations without redundant composite indexes.
+  degreeId     String?                @unique @db.Uuid
+  careerStepId String?                @unique @db.Uuid
+
+  alumni     Alumni      @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  degree     Degree?     @relation(fields: [alumniId, degreeId], references: [alumniId, id], onDelete: Cascade, onUpdate: NoAction)
+  careerStep CareerStep? @relation(fields: [alumniId, careerStepId], references: [alumniId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alumniId, position])
 }
 
 model SurveyResponse {
@@ -119,4 +198,15 @@ model SurveyResponse {
 
   @@unique([surveyId, alumniId])
   @@index([alumniId, referenceDegreeId])
+}
+
+model AlumniContact {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId    String   @unique @db.Uuid
+  displayName String?
+  email       String?
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
