@@ -1,4 +1,5 @@
-import type { Degree, PrismaClient, SurveyResponse } from "../generated/prisma/client";
+import type { Degree, PrismaClient, Program, SurveyResponse } from "../generated/prisma/client";
+import { InvalidOperatorConfigurationError, validateOperatorScope, type SurveyResponseServiceConfiguration } from "./operator-scope";
 import { withOpenSurvey } from "./survey-service";
 
 export type CreateConfirmedSurveyResponseInput = {
@@ -57,18 +58,40 @@ export class SurveyResponseAlreadyExistsError extends Error {
   }
 }
 
+export class SurveyOutsideOperatorScopeError extends Error {
+  constructor(public readonly surveyId: string, public readonly reason: "INSTITUTION_MISMATCH" | "FACULTY_MISMATCH" | "PROGRAM_NOT_FOUND") {
+    super(`Survey ${surveyId} is outside the configured operator scope: ${reason}`);
+    this.name = "SurveyOutsideOperatorScopeError";
+  }
+}
+
 /** Create only the explicitly selected, already-confirmed response. C.1 commits
  * before returning success. No user interaction occurs inside this transaction.
  * Future Degree writers must also lock Survey -> Alumni -> Degree and validate
  * existing responses before changing a referenced Degree's Program or status.
- * Operator affiliation remains unvalidated: no installation configuration
- * contract exists yet to identify the operator Institution.
+ * Configuration must come from trusted server-side installation configuration,
+ * never from alumni-supplied input. Program affiliation is checked before Alumni.
  */
 export async function createConfirmedSurveyResponse(
   client: PrismaClient,
   input: CreateConfirmedSurveyResponseInput,
+  configuration: SurveyResponseServiceConfiguration,
 ): Promise<SurveyResponse> {
   return withOpenSurvey(client, input.surveyId, async (tx, survey) => {
+    const scope = validateOperatorScope(configuration?.operatorScope);
+    const institution = await tx.institution.findUnique({ where: { id: scope.institutionId }, select: { id: true } });
+    if (!institution) throw new InvalidOperatorConfigurationError("INSTITUTION_NOT_FOUND");
+
+    // Keep affiliation stable until commit without changing the relative
+    // Survey -> Alumni -> Degree order of the existing exclusive row locks.
+    const [program] = await tx.$queryRaw<Pick<Program, "id" | "institutionId" | "faculty">[]>`
+      SELECT "id", "institutionId", "faculty"
+      FROM "Program" WHERE "id" = ${survey.referenceProgramId}::uuid FOR SHARE
+    `;
+    if (!program) throw new SurveyOutsideOperatorScopeError(survey.id, "PROGRAM_NOT_FOUND");
+    if (program.institutionId !== institution.id) throw new SurveyOutsideOperatorScopeError(survey.id, "INSTITUTION_MISMATCH");
+    if (scope.kind === "FACULTY" && program.faculty !== scope.faculty) throw new SurveyOutsideOperatorScopeError(survey.id, "FACULTY_MISMATCH");
+
     if (typeof input.referenceDegreeId !== "string" || !input.referenceDegreeId) {
       throw new ReferenceDegreeSelectionRequiredError();
     }
