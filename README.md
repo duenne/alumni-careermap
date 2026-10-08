@@ -1,7 +1,9 @@
 # Alumni CareerMap
 
-Self-hostbarer Open-Source-Bootstrap mit Next.js, React, TypeScript, Prisma
-und PostgreSQL. Es sind noch keine Domainmodelle oder Alumni-Daten enthalten.
+Self-hostbare Open-Source-Anwendung mit Next.js, React, TypeScript, Prisma
+und PostgreSQL 17. Phase A enthält ausschließlich Institution, Program, Survey,
+Alumni, Degree und SurveyResponse; es gibt keine Seed- oder Alumni-Daten.
+Die fachliche Quelle ist [`docs/architecture/MVP_DOMAIN_MODEL.md`](docs/architecture/MVP_DOMAIN_MODEL.md).
 
 ## Voraussetzungen
 
@@ -19,8 +21,8 @@ und PostgreSQL. Es sind noch keine Domainmodelle oder Alumni-Daten enthalten.
 4. `http://localhost:3000` öffnen.
 
 Compose startet PostgreSQL, führt `prisma migrate deploy` aus und startet danach
-die Anwendung. Das Schema hat zunächst keine Domainmodelle und keine fachlichen
-Migrationen. PostgreSQL ist die einzige unterstützte Datenbank.
+die Anwendung. Die versionierten Migrationen bauen das Phase-A-Schema auch auf
+einer leeren Datenbank auf. PostgreSQL 17 ist die einzige unterstützte Datenbank.
 
 `GET /api/health` prüft mit Prisma die Datenbankverbindung und antwortet mit
 HTTP 200 (`{"status":"ok"}`) oder HTTP 503 (`{"status":"unavailable"}`).
@@ -47,16 +49,26 @@ standardmäßig keinen Host-Port.
 ```sh
 npm run lint
 npm test
+npm run db:validate
+npm run test:integration
 npm run typecheck
 npm run build
 ```
 
-Tests verwenden keine Alumni-Daten. Builds benötigen weder Datenbankzugriff noch
+Integrationstests benötigen Docker. `npm run test:integration` startet einen
+isolierten PostgreSQL-17-Container, migriert eine leere Datenbank und prüft die
+DB-Invarianten direkt über SQL. Die vorhandene `DATABASE_URL` wird nicht benutzt;
+der Testcontainer wird anschließend entfernt. Technische Testdatensätze leben
+nur in zurückgerollten Transaktionen; es gibt keine Fixture-Dateien oder Seeds.
+Die CI führt dieselben Prüfungen aus.
+
+Tests verwenden keine personenbezogenen Alumni-Daten. Builds benötigen weder Datenbankzugriff noch
 Secrets. Generierter Prisma-Code und lokale `.env`-Dateien werden nicht versioniert
 und nicht in den Docker-Build-Kontext übernommen.
 
 Neue fachliche Migrationen werden später mit `npm run db:migrate` erstellt und
-versioniert. Produktionsmigrationen laufen über `npm run db:deploy`; es gibt
+versioniert. SQL-only Checks und `NULLS NOT DISTINCT` müssen dabei erhalten bleiben;
+`prisma db push` ersetzt die Migrationen nicht. Produktionsmigrationen laufen über `npm run db:deploy`; es gibt
 keinen automatischen Seed.
 
 Die Analyse verbleibender Dependency- und ESLint-Probleme steht in

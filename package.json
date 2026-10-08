@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "node scripts/test-integration.mjs",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",

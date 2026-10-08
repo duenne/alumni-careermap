@@ -7,4 +7,116 @@ datasource db {
   provider = "postgresql"
 }
 
-// Domain models will be introduced separately from the bootstrap.
+enum SurveyStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum DegreeLevel {
+  BACHELOR
+  MASTER
+  PHD
+  DIPLOMA
+  CERTIFICATE
+  OTHER
+}
+
+enum DegreeStatus {
+  IN_PROGRESS
+  COMPLETED
+  ENDED_WITHOUT_DEGREE
+  UNKNOWN
+}
+
+model Institution {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  name      String
+  location  String?
+
+  programs Program[]
+  degrees  Degree[]
+}
+
+model Program {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  institutionId String   @db.Uuid
+  name          String
+  faculty       String?
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  surveys     Survey[]
+  degrees     Degree[]
+
+  // The migration adds NULLS NOT DISTINCT; Prisma cannot express it here.
+  @@unique([institutionId, name, faculty])
+}
+
+model Survey {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  name               String
+  referenceProgramId String       @db.Uuid
+  status             SurveyStatus @default(DRAFT)
+
+  referenceProgram Program          @relation(fields: [referenceProgramId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  responses        SurveyResponse[]
+
+  @@index([referenceProgramId])
+}
+
+model Alumni {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  degrees   Degree[]
+  responses SurveyResponse[]
+}
+
+model Degree {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  alumniId       String       @db.Uuid
+  level          DegreeLevel
+  status         DegreeStatus
+  programId      String?      @db.Uuid
+  institutionId  String?      @db.Uuid
+  title          String?
+  fieldOfStudy   String?
+  startYear      Int?
+  endYear        Int?
+  graduationYear Int?
+
+  alumni             Alumni           @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  program            Program?         @relation(fields: [programId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  institution        Institution?     @relation(fields: [institutionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  referenceResponses SurveyResponse[]
+
+  @@unique([alumniId, id])
+  @@index([programId])
+  @@index([institutionId])
+}
+
+model SurveyResponse {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  surveyId          String   @db.Uuid
+  alumniId          String   @db.Uuid
+  referenceDegreeId String   @db.Uuid
+  confirmedAt       DateTime @db.Timestamptz(3)
+
+  survey          Survey @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  alumni          Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  referenceDegree Degree @relation(fields: [alumniId, referenceDegreeId], references: [alumniId, id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([surveyId, alumniId])
+  @@index([alumniId, referenceDegreeId])
+}
