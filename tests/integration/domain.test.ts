@@ -42,10 +42,10 @@ beforeEach(async () => { db = await pool.connect(); await db.query("BEGIN"); });
 afterEach(async () => { await db.query("ROLLBACK"); db.release(); });
 afterAll(async () => { await pool.end(); });
 
-describe("Phase A through B.3 database contract", () => {
-  it("contains only nine domain tables and pseudonymized Alumni columns", async () => {
+describe("Phase A through B.4 database contract", () => {
+  it("contains only ten domain tables and pseudonymized Alumni columns", async () => {
     const tables = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename");
-    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "AlumniTimelineItem", "CareerStep", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
+    expect(tables.rows.map(row => row.tablename)).toEqual(["Alumni", "AlumniContact", "AlumniTimelineItem", "CareerStep", "Degree", "Institution", "Organisation", "Program", "Survey", "SurveyResponse"]);
     const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Alumni' ORDER BY ordinal_position");
     expect(columns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt"]);
   });
@@ -56,13 +56,14 @@ describe("Phase A through B.3 database contract", () => {
     const organisation = await insert("Organisation", { name: "Organisation A" });
     const careerStep = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" });
     const timelineItem = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
-    for (const row of [institution, program, survey, alumni, degree, response, organisation, careerStep, timelineItem]) {
+    const contact = await insert("AlumniContact", { alumniId: alumni.id, displayName: "Synthetic Contact A" });
+    for (const row of [institution, program, survey, alumni, degree, response, organisation, careerStep, timelineItem, contact]) {
       expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(row.createdAt).toBeInstanceOf(Date);
       expect(row.updatedAt).toBeInstanceOf(Date);
     }
     const columns = await db.query("SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND column_name IN ('createdAt', 'updatedAt', 'confirmedAt')");
-    expect(columns.rows).toHaveLength(19);
+    expect(columns.rows).toHaveLength(21);
     for (const row of columns.rows) expect(row).toEqual({ data_type: "timestamp with time zone", is_nullable: "NO" });
     const triggers = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)");
     expect(triggers.rows).toEqual([]);
@@ -733,6 +734,175 @@ describe("AlumniTimelineItem", () => {
     ]);
     const ownerKeys = await db.query("SELECT c.relname AS name, i.indimmediate, ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indisunique AND c.relname IN ('Degree_alumniId_id_key', 'CareerStep_alumniId_id_key') ORDER BY c.relname");
     expect(ownerKeys.rows).toEqual([{ name: "CareerStep_alumniId_id_key", indimmediate: true, columns: ["alumniId", "id"] }, { name: "Degree_alumniId_id_key", indimmediate: true, columns: ["alumniId", "id"] }]);
+  });
+});
+
+describe("AlumniContact", () => {
+  async function contactContext(values: Values = { displayName: "Synthetic Contact A" }) {
+    const alumni = await insert("Alumni");
+    const contact = await insert("AlumniContact", { alumniId: alumni.id, ...values });
+    return { alumni, contact };
+  }
+
+  it("contains exactly the normative contact fields and no personal identifiers in Alumni", async () => {
+    const columns = await db.query("SELECT column_name, data_type, is_nullable, column_default, datetime_precision FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'AlumniContact' ORDER BY ordinal_position");
+    expect(columns.rows).toEqual([
+      { column_name: "id", data_type: "uuid", is_nullable: "NO", column_default: "gen_random_uuid()", datetime_precision: null },
+      { column_name: "createdAt", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "CURRENT_TIMESTAMP", datetime_precision: 3 },
+      { column_name: "updatedAt", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "CURRENT_TIMESTAMP", datetime_precision: 3 },
+      { column_name: "alumniId", data_type: "uuid", is_nullable: "NO", column_default: null, datetime_precision: null },
+      { column_name: "displayName", data_type: "text", is_nullable: "YES", column_default: null, datetime_precision: null },
+      { column_name: "email", data_type: "text", is_nullable: "YES", column_default: null, datetime_precision: null },
+    ]);
+    const alumniColumns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Alumni' ORDER BY ordinal_position");
+    expect(alumniColumns.rows.map(row => row.column_name)).toEqual(["id", "createdAt", "updatedAt"]);
+  });
+
+  it.each(["displayName", "email", "both"])("creates with %s, a random UUID and required timestamps", async fields => {
+    const values: Values = {};
+    if (fields !== "email") values.displayName = "Synthetic Contact A";
+    if (fields !== "displayName") values.email = "contact-a@example.invalid";
+    const { alumni, contact } = await contactContext(values);
+    expect(contact).toMatchObject({ alumniId: alumni.id, displayName: values.displayName ?? null, email: values.email ?? null });
+    expect(contact.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(contact.createdAt).toBeInstanceOf(Date);
+    expect(contact.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it.each(["displayName", "email"])("accepts NULL optional %s when the other value is present on insert and update", async column => {
+    const otherColumn = column === "displayName" ? "email" : "displayName";
+    const otherValue = column === "displayName" ? "contact-a@example.invalid" : "Synthetic Contact A";
+    const { contact } = await contactContext({ [column]: null, [otherColumn]: otherValue });
+    expect(contact[column]).toBeNull();
+    const both = await contactContext({ displayName: "Synthetic Contact B", email: "contact-b@example.invalid" });
+    const updated = await db.query(`UPDATE "AlumniContact" SET "${column}" = NULL WHERE id = $1 RETURNING *`, [both.contact.id]);
+    expect(updated.rows[0][column]).toBeNull();
+    expect(updated.rows[0][otherColumn]).not.toBeNull();
+  });
+
+  it("rejects an empty contact on insert and update", async () => {
+    const { alumni, contact } = await contactContext();
+    await rejectsSql('INSERT INTO "AlumniContact" ("alumniId") VALUES ($1)', [alumni.id], "23514", "AlumniContact_contact_present");
+    for (const [displayName, email] of [[null, null], ["", ""], [" \t\n", " \t\n"], ["", null], [null, " "]]) {
+      await rejectsSql('INSERT INTO "AlumniContact" ("alumniId", "displayName", email) VALUES ($1, $2, $3)', [alumni.id, displayName, email], "23514");
+      await rejectsSql('UPDATE "AlumniContact" SET "displayName" = $1, email = $2 WHERE id = $3', [displayName, email, contact.id], "23514");
+    }
+  });
+
+  it.each(["displayName", "email"])("rejects blank optional %s even when the other value is valid on insert and update", async column => {
+    const otherColumn = column === "displayName" ? "email" : "displayName";
+    const otherValue = column === "displayName" ? "contact-a@example.invalid" : "Synthetic Contact A";
+    const { alumni, contact } = await contactContext({ displayName: "Synthetic Contact A", email: "contact-a@example.invalid" });
+    for (const value of ["", " ", "\t\r\n", " \t\n"]) {
+      await rejectsSql(`INSERT INTO "AlumniContact" ("alumniId", "${column}", "${otherColumn}") VALUES ($1, $2, $3)`, [alumni.id, value, otherValue], "23514", `AlumniContact_${column}_nonblank`);
+      await rejectsSql(`UPDATE "AlumniContact" SET "${column}" = $1 WHERE id = $2`, [value, contact.id], "23514", `AlumniContact_${column}_nonblank`);
+    }
+  });
+
+  it("rejects duplicate contacts for one Alumni on insert and owner update", async () => {
+    const first = await contactContext();
+    await rejectsSql('INSERT INTO "AlumniContact" ("alumniId", email) VALUES ($1, $2)', [first.alumni.id, "contact-b@example.invalid"], "23505", "AlumniContact_alumniId_key");
+    const second = await contactContext({ email: "contact-b@example.invalid" });
+    await rejectsSql('UPDATE "AlumniContact" SET "alumniId" = $1 WHERE id = $2', [first.alumni.id, second.contact.id], "23505", "AlumniContact_alumniId_key");
+  });
+
+  it("accepts the same email for different Alumni on insert and update without merging them", async () => {
+    const email = "shared-contact@example.invalid";
+    const first = await contactContext({ email });
+    const second = await contactContext({ email });
+    expect(second.contact.id).not.toBe(first.contact.id);
+    expect(second.alumni.id).not.toBe(first.alumni.id);
+    const third = await contactContext({ email: "contact-c@example.invalid" });
+    await db.query('UPDATE "AlumniContact" SET email = $1 WHERE id = $2', [email, third.contact.id]);
+    expect((await db.query('SELECT id FROM "AlumniContact" WHERE email = $1', [email])).rows).toHaveLength(3);
+    expect((await db.query('SELECT id FROM "Alumni"')).rows).toHaveLength(3);
+  });
+
+  it("leaves email format and text normalization to future services", async () => {
+    const { contact } = await contactContext({ email: "synthetic-contact-token" });
+    expect(contact.email).toBe("synthetic-contact-token");
+    const updated = await db.query('UPDATE "AlumniContact" SET email = $1, "displayName" = $2 WHERE id = $3 RETURNING email, "displayName"', [" contact-a@example.invalid ", " Synthetic Contact A ", contact.id]);
+    expect(updated.rows[0]).toEqual({ email: " contact-a@example.invalid ", displayName: " Synthetic Contact A " });
+  });
+
+  it("rejects missing alumniId", async () => {
+    await rejectsSql('INSERT INTO "AlumniContact" (email) VALUES ($1)', ["contact-a@example.invalid"], "23502");
+  });
+
+  it("rejects unknown alumniId on insert and update", async () => {
+    const { contact } = await contactContext();
+    await rejectsSql('INSERT INTO "AlumniContact" ("alumniId", email) VALUES ($1, $2)', [randomUUID(), "contact-a@example.invalid"], "23503", "AlumniContact_alumniId_fkey");
+    await rejectsSql('UPDATE "AlumniContact" SET "alumniId" = $1 WHERE id = $2', [randomUUID(), contact.id], "23503", "AlumniContact_alumniId_fkey");
+  });
+
+  it.each(["id", "alumniId"])("rejects invalid UUID %s on insert and update", async column => {
+    const { alumni, contact } = await contactContext();
+    const values: Values = { alumniId: alumni.id, email: "contact-a@example.invalid", [column]: "invalid" };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "AlumniContact" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "22P02");
+    await rejectsSql(`UPDATE "AlumniContact" SET "${column}" = $1 WHERE id = $2`, ["invalid", contact.id], "22P02");
+  });
+
+  it.each(["id", "createdAt", "updatedAt", "alumniId"])("rejects NULL required %s on insert and update", async column => {
+    const { alumni, contact } = await contactContext();
+    const values: Values = { id: randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), alumniId: alumni.id, email: "contact-a@example.invalid", [column]: null };
+    const entries = Object.entries(values);
+    await rejectsSql(`INSERT INTO "AlumniContact" (${entries.map(([key]) => `"${key}"`).join(", ")}) VALUES (${entries.map((_, i) => `$${i + 1}`).join(", ")})`, entries.map(([, value]) => value), "23502");
+    await rejectsSql(`UPDATE "AlumniContact" SET "${column}" = NULL WHERE id = $1`, [contact.id], "23502");
+  });
+
+  it("enforces UUID primary key uniqueness independently of the owner", async () => {
+    const first = await contactContext();
+    const alumni = await insert("Alumni");
+    await rejectsSql('INSERT INTO "AlumniContact" (id, "alumniId", email) VALUES ($1, $2, $3)', [first.contact.id, alumni.id, "contact-b@example.invalid"], "23505", "AlumniContact_pkey");
+    const second = await insert("AlumniContact", { alumniId: alumni.id, email: "contact-b@example.invalid" });
+    expect(second.id).not.toBe(first.contact.id);
+    await rejectsSql('UPDATE "AlumniContact" SET id = $1 WHERE id = $2', [first.contact.id, second.id], "23505", "AlumniContact_pkey");
+  });
+
+  it("stores a complete career profile and response without contact, and retains them when contact is deleted", async () => {
+    const { alumni, degree, survey } = await context();
+    const careerStep = await insert("CareerStep", { alumniId: alumni.id, type: "EMPLOYMENT", temporalStatus: "UNKNOWN" });
+    const degreeItem = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "DEGREE", position: 1, degreeId: degree.id });
+    const careerItem = await insert("AlumniTimelineItem", { alumniId: alumni.id, type: "CAREER_STEP", position: 2, careerStepId: careerStep.id });
+    const response = await insert("SurveyResponse", { alumniId: alumni.id, surveyId: survey.id, referenceDegreeId: degree.id, confirmedAt: new Date().toISOString() });
+    expect((await db.query('SELECT id FROM "AlumniContact" WHERE "alumniId" = $1', [alumni.id])).rows).toEqual([]);
+    const contact = await insert("AlumniContact", { alumniId: alumni.id, email: "contact-a@example.invalid" });
+    await db.query('DELETE FROM "AlumniContact" WHERE id = $1', [contact.id]);
+    expect((await db.query('SELECT id FROM "AlumniContact" WHERE "alumniId" = $1', [alumni.id])).rows).toEqual([]);
+    for (const [table, id] of [["Alumni", alumni.id], ["Degree", degree.id], ["CareerStep", careerStep.id], ["AlumniTimelineItem", degreeItem.id], ["AlumniTimelineItem", careerItem.id], ["SurveyResponse", response.id]]) {
+      expect((await db.query(`SELECT id FROM "${table}" WHERE id = $1`, [id])).rows).toEqual([{ id }]);
+    }
+  });
+
+  it("cascades Alumni deletion to its contact, preserving another Alumni's contact", async () => {
+    const first = await contactContext();
+    const second = await contactContext({ email: "contact-b@example.invalid" });
+    await db.query('DELETE FROM "Alumni" WHERE id = $1', [first.alumni.id]);
+    expect((await db.query('SELECT id FROM "AlumniContact"')).rows).toEqual([{ id: second.contact.id }]);
+    expect((await db.query('SELECT id FROM "Alumni" WHERE id = $1', [second.alumni.id])).rows).toEqual([{ id: second.alumni.id }]);
+  });
+
+  it("uses NO ACTION for referenced Alumni key updates", async () => {
+    const { alumni, contact } = await contactContext();
+    await rejectsSql('UPDATE "Alumni" SET id = $1 WHERE id = $2', [randomUUID(), alumni.id], "23503", "AlumniContact_alumniId_fkey");
+    expect((await db.query('SELECT "alumniId" FROM "AlumniContact" WHERE id = $1', [contact.id])).rows).toEqual([{ alumniId: alumni.id }]);
+  });
+
+  it("has a real owner FK, three validated CHECKs and only the PK and owner unique indexes", async () => {
+    const fks = await db.query("SELECT conname, confrelid::regclass::text AS target, confdeltype, confupdtype, condeferrable, ARRAY(SELECT a.attname::text FROM unnest(conkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = conrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns, ARRAY(SELECT a.attname::text FROM unnest(confkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = confrelid AND a.attnum = k.attnum ORDER BY k.position) AS references FROM pg_constraint WHERE conrelid = '\"AlumniContact\"'::regclass AND contype = 'f'");
+    expect(fks.rows).toEqual([{ conname: "AlumniContact_alumniId_fkey", target: '\"Alumni\"', confdeltype: "c", confupdtype: "a", condeferrable: false, columns: ["alumniId"], references: ["id"] }]);
+    const checks = await db.query("SELECT conname, convalidated FROM pg_constraint WHERE conrelid = '\"AlumniContact\"'::regclass AND contype = 'c' ORDER BY conname");
+    expect(checks.rows).toEqual([
+      { conname: "AlumniContact_contact_present", convalidated: true },
+      { conname: "AlumniContact_displayName_nonblank", convalidated: true },
+      { conname: "AlumniContact_email_nonblank", convalidated: true },
+    ]);
+    const indexes = await db.query("SELECT c.relname AS name, i.indisunique, i.indimmediate, ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.position) AS columns FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indrelid = '\"AlumniContact\"'::regclass ORDER BY c.relname");
+    expect(indexes.rows).toEqual([
+      { name: "AlumniContact_alumniId_key", indisunique: true, indimmediate: true, columns: ["alumniId"] },
+      { name: "AlumniContact_pkey", indisunique: true, indimmediate: true, columns: ["id"] },
+    ]);
   });
 });
 
