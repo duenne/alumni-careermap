@@ -1,8 +1,10 @@
 # Alumni CareerMap
 
 Self-hostbare Open-Source-Anwendung mit Next.js, React, TypeScript, Prisma
-und PostgreSQL 17. Phase A enthält ausschließlich Institution, Program, Survey,
-Alumni, Degree und SurveyResponse; es gibt keine Seed- oder Alumni-Daten.
+und PostgreSQL 17. Die Domänengrundlage aus Phase A und Phase B ist vollständig:
+Institution, Program, Survey, Alumni, Degree, SurveyResponse, Organisation,
+CareerStep, AlumniTimelineItem und das optionale AlumniContact bilden die zehn
+kanonischen Domänenentitäten. Es gibt keine Seed- oder Alumni-Daten.
 Die fachliche Quelle ist [`docs/architecture/MVP_DOMAIN_MODEL.md`](docs/architecture/MVP_DOMAIN_MODEL.md).
 
 ## Voraussetzungen
@@ -21,8 +23,9 @@ Die fachliche Quelle ist [`docs/architecture/MVP_DOMAIN_MODEL.md`](docs/architec
 4. `http://localhost:3000` öffnen.
 
 Compose startet PostgreSQL, führt `prisma migrate deploy` aus und startet danach
-die Anwendung. Die versionierten Migrationen bauen das Phase-A-Schema auch auf
-einer leeren Datenbank auf. PostgreSQL 17 ist die einzige unterstützte Datenbank.
+die Anwendung. Die fünf versionierten PostgreSQL-Migrationen bauen das vollständige
+Schema von Phase A und Phase B auch auf einer leeren Datenbank auf.
+PostgreSQL 17 ist die einzige unterstützte Datenbank.
 
 `GET /api/health` prüft mit Prisma die Datenbankverbindung und antwortet mit
 HTTP 200 (`{"status":"ok"}`) oder HTTP 503 (`{"status":"unavailable"}`).
@@ -60,7 +63,8 @@ isolierten PostgreSQL-17-Container, migriert eine leere Datenbank und prüft die
 DB-Invarianten direkt über SQL. Die vorhandene `DATABASE_URL` wird nicht benutzt;
 der Testcontainer wird anschließend entfernt. Technische Testdatensätze leben
 nur in zurückgerollten Transaktionen; es gibt keine Fixture-Dateien oder Seeds.
-Die CI führt dieselben Prüfungen aus.
+Die CI führt bei Pushes und Pull Requests dieselben Prüfungen aus, einschließlich
+eines expliziten Typechecks vor dem Produktionsbuild.
 
 Tests verwenden keine personenbezogenen Alumni-Daten. Builds benötigen weder Datenbankzugriff noch
 Secrets. Generierter Prisma-Code und lokale `.env`-Dateien werden nicht versioniert
