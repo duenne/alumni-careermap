@@ -144,8 +144,10 @@ async function waitingPid(blockerPid: number, table: string, operation: string) 
 }
 
 describe("Transactional Alumni profile deletion", () => {
-  it("deletes an empty Alumni and commits before returning", async () => {
+  it("deletes an empty Alumni, commits before returning and explicitly rejects repeated deletion", async () => {
     expect(await deleteAlumniProfile(client, alumniId)).toBeUndefined();
+    await expectDeleted();
+    await expect(deleteAlumniProfile(client, alumniId)).rejects.toMatchObject({ name: "AlumniNotFoundError", alumniId });
     await expectDeleted();
   });
 
@@ -245,7 +247,7 @@ describe("Alumni deletion transaction and concurrency", () => {
     } finally { await db.query("ROLLBACK"); db.release(); await Promise.allSettled([deletion]); }
   });
 
-  it("rolls back response deletion and every cascade when PostgreSQL cancels the final delete", async () => {
+  it("rolls back response deletion and every cascade on cancellation, then permits a successful retry", async () => {
     const profile = await completeProfile();
     const before = await profileSnapshot();
     const db = await observer.connect();
@@ -267,6 +269,8 @@ describe("Alumni deletion transaction and concurrency", () => {
       expect(await profileSnapshot()).toEqual(before);
       // Rollback also releases the service's Alumni lock.
       expect((await observer.query('SELECT id FROM "Alumni" WHERE id = $1 FOR UPDATE NOWAIT', [alumniId])).rows).toEqual([{ id: alumniId }]);
+      await deleteAlumniProfile(client, alumniId);
+      await expectDeleted();
     } finally { await db.query("ROLLBACK"); db.release(); await Promise.allSettled([deletion]); }
   });
 
