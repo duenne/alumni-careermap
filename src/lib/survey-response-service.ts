@@ -67,8 +67,8 @@ export class SurveyOutsideOperatorScopeError extends Error {
 
 /** Create only the explicitly selected, already-confirmed response. C.1 commits
  * before returning success. No user interaction occurs inside this transaction.
- * Future Degree writers must also lock Survey -> Alumni -> Degree and validate
- * existing responses before changing a referenced Degree's Program or status.
+ * Degree updates share the Alumni -> Degree locks and validate existing responses.
+ * They must not acquire Survey locks after Alumni; creation locks Survey first.
  * Configuration must come from trusted server-side installation configuration,
  * never from alumni-supplied input. Program affiliation is checked before Alumni.
  */
