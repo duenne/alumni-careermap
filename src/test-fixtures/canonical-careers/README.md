@@ -124,7 +124,7 @@ comparing resolved stations, mappings, timeline and review needs to this oracle.
 It must not convert candidates into a confirmed participation. This is a compact
 semantic reference catalog, not comprehensive input/parser coverage.
 
-Questions for D.3:
+Remaining questions for Phase E and later work:
 
 1. Which raw date/text vocabularies and invalid/reversed-date review outcomes
    should be specified beyond the explicit source facts used here?
@@ -139,7 +139,7 @@ Questions for D.3:
 6. What provenance/privacy evidence and retention rules would be needed before
    any separate local corpus could be considered for a later phase?
 
-## Exact review patch file list
+## Exact D.2 review patch file list
 
 ```text
 src/test-fixtures/canonical-careers/README.md
@@ -151,3 +151,55 @@ src/test-fixtures/canonical-careers/inputs.ts
 ```
 
 No application code, schema, migrations, normative model or D.1 files are changed.
+
+## Phase D.3 PostgreSQL compatibility
+
+`tests/integration/canonical-fixture-contract.test.ts` adds 12 round-trip tests,
+one per case, and one cleanup-isolation test. Run `npm run test:integration` through
+the existing runner: it creates fresh disposable PostgreSQL 17, applies all five
+existing migrations, runs the integration suites and removes the container.
+
+The local test helper inserts shared synthetic catalogs, a minimal DRAFT Survey,
+one Alumni and only the authored `expected` Degrees, CareerSteps and TimelineItems.
+Every case gets separate temporary catalog rows; identical names never merge.
+PostgreSQL generates UUIDs; technical timestamps use the existing schema defaults
+and Prisma behavior. In-memory maps correlate symbolic keys to UUIDs; no symbolic
+key is stored in a domain column. Construction commits in
+one transaction or rolls back entirely. An independent Prisma client/pool reads
+the committed records and projects their UUIDs back through those maps. Unexpected
+IDs fail projection. Deep comparisons use the original authored oracle, retaining
+all declared scalars, NULLs, catalog relationships and timeline positions.
+
+Candidate eligibility is queried by the persisted Survey's reference Program,
+Alumni ownership and COMPLETED status, then compared with the fixture's candidate
+set. No reference is selected. No SurveyResponse, confirmedAt or AlumniContact is
+created. Zero candidates and the review-required profile are not completed
+participations. Input histories, mappings, unresolved questions, provenance labels
+and approximate date text remain test metadata, with no persistence target.
+
+Cleanup uses only recorded UUIDs, deleting scoped responses first defensively,
+then Alumni with its cascading stations/timeline, Survey, Programs, Organisations
+and Institutions. It runs after assertions fail as well as when they pass. The
+isolation test inserts two independent copies of case 02, removes the first,
+checks that its records are gone, and round-trips the second unchanged.
+
+RED: all 13 new tests failed on the unimplemented test-only construction helper;
+all 350 existing integration tests passed. After implementing that local helper,
+all 363 integration tests and all 119 unit tests passed. Prisma validation, lint,
+typecheck, production build and `git diff --check` passed; no required check was
+skipped. No fixture/constraint
+discrepancy was found, and no fixture correction was needed. Compatibility proves
+faithful storage of this oracle; it does not independently establish provenance,
+interpret source facts, resolve ambiguity, or validate a completed donation.
+
+This helper is private to the test suite, not a Phase F persistence service. It
+provides no production import, authorization, confirmation or orchestration API.
+Phase E still needs the source vocabulary, raw-date/error, catalog-resolution,
+review-response and split/merge/duplicate contracts listed above.
+
+Exact D.3 review patch files:
+
+```text
+tests/integration/canonical-fixture-contract.test.ts
+src/test-fixtures/canonical-careers/README.md
+```
