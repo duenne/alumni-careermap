@@ -6,3 +6,4 @@ src/generated/
 !.env.example
 *.tsbuildinfo
 .DS_Store
+.local-fixtures/
