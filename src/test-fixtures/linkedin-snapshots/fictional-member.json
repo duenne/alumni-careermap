@@ -1,0 +1,60 @@
+{
+  "elements": [
+    {
+      "snapshotDomain": "PROFILE",
+      "snapshotData": [{
+        "First Name": "Fictional Profile Given Name",
+        "Last Name": "Fictional Profile Family Name",
+        "Email": "fictional-profile@example.invalid",
+        "Birth Date": "1988-02-17",
+        "Profile URL": "https://example.invalid/fictional-profile",
+        "Location": "Fictional Profile Location",
+        "Member ID": "fictional-private-member-id"
+      }]
+    },
+    {
+      "snapshotDomain": "POSITIONS",
+      "snapshotData": [
+        {
+          "Title": "Synthetic Research Assistant",
+          "Company Name": "Synthetic University",
+          "Started On": "Mar 2023",
+          "Finished On": "",
+          "Description": "FICTIONAL_DESCRIPTION_DO_NOT_COPY",
+          "Location": "FICTIONAL_POSITION_LOCATION_DO_NOT_COPY",
+          "Position ID": "fictional-private-position-id"
+        },
+        {
+          "Title": "Synthetic Internship",
+          "Company Name": "Synthetic Workshop",
+          "Started On": "2019",
+          "Finished On": "Feb 2020",
+          "Description": "",
+          "Location": ""
+        }
+      ]
+    },
+    {
+      "snapshotDomain": "EDUCATION",
+      "snapshotData": [
+        {
+          "Degree Name": "Synthetic M.Sc.",
+          "School Name": "Synthetic University",
+          "Start Date": "2019",
+          "End Date": "2022",
+          "Activities": "FICTIONAL_ACTIVITIES_DO_NOT_COPY",
+          "Notes": "FICTIONAL_NOTES_DO_NOT_COPY",
+          "Education ID": "fictional-private-education-id"
+        },
+        {
+          "Degree Name": "Synthetic Short Course",
+          "School Name": "Synthetic Workshop",
+          "Start Date": "around 2018",
+          "End Date": "",
+          "Activities": "",
+          "Notes": ""
+        }
+      ]
+    }
+  ]
+}
