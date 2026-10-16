@@ -1,0 +1,12 @@
+.back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 1.5rem; }
+.intro { max-width: 46rem; margin-bottom: 2.5rem; }
+.intro .notice { display: inline-block; border-left: 3px solid var(--accent); padding-left: 0.75rem; font-weight: 700; margin: 0; }
+.sectionHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1.5rem; }
+.sectionHeading h2 { margin: 0; }
+.sectionHeading span, .sourceNote { font-size: 0.875rem; color: var(--muted); }
+.sourceNote { margin: 0.5rem 0 1.25rem; }
+.closing { margin-block: 1.5rem 0; font-size: 0.875rem; color: var(--muted); }
+.evidenceSummary { margin-top: 1.5rem; display: grid; gap: 1rem; }
+.evidenceSummary dt { font-weight: 700; }
+.evidenceSummary dd { margin: 0.25rem 0 0; color: var(--muted); }
+.nextStep { margin-top: 2rem; border-top: 1px solid #dedede; padding-top: 1rem; }
