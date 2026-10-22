@@ -8,11 +8,15 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:import": "CAREERMAP_DEV_IMPORT=1 next dev --hostname localhost --port 3100",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "npm run build && playwright test && npm run test:e2e:import && npm run test:e2e:oauth",
+    "test:e2e:import": "playwright test --config playwright.import.config.ts",
+    "test:e2e:oauth": "playwright test --config playwright.oauth.config.ts",
     "test:integration": "node scripts/test-integration.mjs",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
@@ -34,6 +38,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.0.0",
     "@types/react": "^19.0.0",

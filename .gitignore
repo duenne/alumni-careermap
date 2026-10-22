@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-import-test/
 coverage/
 src/generated/
 .env*
@@ -7,3 +8,10 @@ src/generated/
 *.tsbuildinfo
 .DS_Store
 .local-fixtures/
+playwright-report/
+playwright-report-v1a/
+playwright-report-oauth/
+test-results/
+test-results-v1a/
+test-results-oauth/
+artifacts/

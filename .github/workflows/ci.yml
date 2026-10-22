@@ -26,3 +26,20 @@ jobs:
       - run: npm run test:integration
       - run: npm run typecheck
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # The production build above is shared with the browser tests.
+      - run: npx playwright test
+      - run: npm run test:e2e:import
+      - run: npm run test:e2e:oauth
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: browser-tests
+          path: |
+            playwright-report/
+            test-results/
+            playwright-report-v1a/
+            test-results-v1a/
+            playwright-report-oauth/
+            test-results-oauth/
+          retention-days: 14

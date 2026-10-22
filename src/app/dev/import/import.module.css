@@ -1,0 +1,9 @@
+.section { margin-block: 2rem; }
+.section label { display: block; font-weight: 700; margin-bottom: 0.5rem; }
+.section textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 0.75rem; font: 0.875rem/1.5 monospace; color: inherit; background: white; border: 1px solid #777; border-radius: 4px; }
+.section select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 0.5rem; font: inherit; color: inherit; background: white; }
+.section button { max-width: 100%; min-height: 48px; padding: 0.75rem 1rem; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); background: white; font: inherit; font-weight: 700; overflow-wrap: anywhere; cursor: pointer; }
+.section button:disabled { opacity: 0.55; cursor: default; }
+.section button:focus-visible, .section textarea:focus-visible, .section select:focus-visible, .section h2:focus { outline: 3px solid #146d86; outline-offset: 4px; }
+.section [role="alert"] { padding: 1rem; border-left: 3px solid var(--accent); background: #fceef0; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-block: 1rem; }
