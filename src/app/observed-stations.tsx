@@ -7,7 +7,7 @@ function observedText(fact: SourceFact<string>, fallback: string): string {
 
 const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
-function ObservedDate({ fact, label }: { fact: SourceFact<SourceDate>; label: "Beginn" | "Ende" }) {
+export function ObservedDate({ fact, label }: { fact: SourceFact<SourceDate>; label: "Beginn" | "Ende" }) {
   if (fact.kind !== "OBSERVED") {
     return <>{label} {fact.kind === "UNKNOWN" ? "unbekannt" : "nicht angegeben"}</>;
   }
