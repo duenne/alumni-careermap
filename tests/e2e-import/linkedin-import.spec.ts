@@ -15,6 +15,29 @@ const connectUI = async (page: import("@playwright/test").Page) => {
   await expect(page.getByRole("button", { name: "Karrieredaten abrufen", exact: true })).toBeEnabled();
 };
 
+test("V1b: Rohdump zeigt beide Domänen und HTTP-Fehler ohne Review-Freigabe; Fixture ersetzt alles", async ({ page }) => {
+  const dump = { kind: "linkedin-raw-preview", complete: false, domains: [
+    { domain: "EDUCATION", stopped: "HTTP_ERROR", pages: [{ page: 0, status: 200, body: { unknownField: "SYNTHETIC_RAW_SENTINEL" } },
+      { page: 1, status: 404, body: { message: "No virtual resource found: synthetic-member" } }] },
+    { domain: "POSITIONS", stopped: "NO_PAGING", pages: [{ page: 0, status: 200, body: { rawPosition: "SYNTHETIC_RAW_SENTINEL" } }] },
+  ] };
+  await page.route("**/api/dev/import/linkedin/raw-snapshot", route => route.fulfill({ json: { source: "linkedin-raw", dump } }));
+  await connectUI(page);
+  await page.getByRole("button", { name: "Rohe API-Antworten abrufen", exact: true }).click();
+  const editor = page.getByLabel("Temporäres Karriere-JSON", { exact: true });
+  await expect(editor).toHaveValue(/No virtual resource found/);
+  await expect(editor).toHaveValue(/SYNTHETIC_RAW_SENTINEL/);
+  await expect(editor).toHaveAttribute("readonly", "");
+  await expect(page.getByRole("button", { name: "JSON prüfen", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "In Karriereansicht übernehmen", exact: true })).toBeDisabled();
+  await expect(page.getByText("Rohantworten · unvollständige Diagnosevorschau · ohne Konvertierung", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Synthetische Testdaten verwenden", exact: true }).click();
+  await expect(editor).not.toHaveValue(/SYNTHETIC_RAW_SENTINEL|No virtual resource found/);
+  await expect(editor).not.toHaveAttribute("readonly", "");
+  await expect(page.getByRole("button", { name: "In Karriereansicht übernehmen", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+});
+
 test("V1b: Snapshot-Fehler unterscheiden Größe und Format ohne persönliche Diagnosedaten", async ({ page }) => {
   let oversized = false;
   await page.route("**/api/dev/import/linkedin/snapshot", route => route.fulfill({ status: 502, json: {

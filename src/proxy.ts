@@ -5,6 +5,9 @@ import { allowDevImport, allowDevImportPage, allowLinkedInCallback } from "./lib
  * This is a local development gate, not participant authorization.
  */
 export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/dev/mapping") && process.env.CAREERMAP_DEV_MAPPING !== "1") {
+    return new NextResponse("Nicht verfügbar.", { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
   if (!allowDevImport(request.headers) && !allowDevImportPage(request) && !allowLinkedInCallback(request)) {
     return new NextResponse("Nicht verfügbar.", {
       status: 404,
@@ -26,5 +29,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dev/import/:path*", "/api/dev/import/:path*", "/auth/linkedin/portability/callback"],
+  matcher: ["/dev/import/:path*", "/dev/mapping/:path*", "/api/dev/import/:path*", "/auth/linkedin/portability/callback"],
 };

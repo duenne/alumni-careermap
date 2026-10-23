@@ -91,17 +91,20 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
         if (!session) return error("BUSY", 429);
         return setCookie(new NextResponse(null, { status: 303, headers: { ...headers, Location: provider(config).authorizationUrl(session.state) } }), request, session.id);
       }
-      if (name !== "snapshot") return unavailable();
+      if (name !== "snapshot" && name !== "raw-snapshot") return unavailable();
       const session = store.get(cookie(request), configKey(config));
       if (!session?.token) return setCookie(error("SESSION_EXPIRED", 401), request);
       if (session.activeRead) return error("BUSY", 409);
       const controller = new AbortController();
       session.activeRead = controller;
       try {
-        const snapshot = await provider(config).snapshot(session.token, controller.signal);
+        const client = provider(config);
+        const snapshot = name === "raw-snapshot" ? await client.rawSnapshot(session.token, controller.signal)
+          : await client.snapshot(session.token, controller.signal);
         // Disconnect/source replacement wins even over an already completed read.
         if (store.get(session.id, session.key) !== session || controller.signal.aborted) return error("SESSION_EXPIRED", 401);
-        return json({ source: "linkedin", snapshot: projectSnapshot(snapshot) });
+        return name === "raw-snapshot" ? json({ source: "linkedin-raw", dump: snapshot })
+          : json({ source: "linkedin", snapshot: projectSnapshot(snapshot) });
       } catch (failure) {
         const code = failure instanceof PortabilityError ? failure.code : "PROVIDER_UNAVAILABLE";
         if (code === "SESSION_EXPIRED" || code === "ACCESS_DENIED") {

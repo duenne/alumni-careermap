@@ -74,7 +74,7 @@ export class SurveyOutsideOperatorScopeError extends Error {
   }
 }
 
-async function validateSurveyAffiliation(
+export async function validateSurveyAffiliation(
   tx: Prisma.TransactionClient,
   survey: Pick<Survey, "id" | "referenceProgramId">,
   configuration: SurveyResponseServiceConfiguration,
@@ -143,22 +143,29 @@ export async function createConfirmedSurveyResponse(
 ): Promise<SurveyResponse> {
   return withOpenSurvey(client, input.surveyId, async (tx, survey) => {
     await validateSurveyAffiliation(tx, survey, configuration);
-    requireConfirmedReferenceSelection(input);
-    const alumni = await lockAlumni(tx, input.alumniId);
-    const degree = await lockReferenceDegree(tx, input.referenceDegreeId, alumni.id, survey.referenceProgramId);
-
-    const existing = await tx.surveyResponse.findUnique({
-      where: { surveyId_alumniId: { surveyId: survey.id, alumniId: alumni.id } },
-    });
-    if (existing) throw new SurveyResponseAlreadyExistsError(survey.id, alumni.id);
-
-    return tx.surveyResponse.create({ data: {
-      surveyId: survey.id,
-      alumniId: alumni.id,
-      referenceDegreeId: degree.id,
-      confirmedAt: new Date(),
-    } });
+    return createConfirmedResponseInTransaction(tx, survey, input);
   });
+}
+
+/** Composition point for atomic profile creation. Caller must already hold the
+ * OPEN Survey lock and validateSurveyAffiliation in this SAME transaction.
+ * This preserves Survey -> Program -> Alumni -> Degree lock ordering.
+ */
+export async function createConfirmedResponseInTransaction(
+  tx: Prisma.TransactionClient,
+  survey: Pick<Survey, "id" | "referenceProgramId">,
+  input: CreateConfirmedSurveyResponseInput,
+): Promise<SurveyResponse> {
+  requireConfirmedReferenceSelection(input);
+  const alumni = await lockAlumni(tx, input.alumniId);
+  const degree = await lockReferenceDegree(tx, input.referenceDegreeId, alumni.id, survey.referenceProgramId);
+  const existing = await tx.surveyResponse.findUnique({
+    where: { surveyId_alumniId: { surveyId: survey.id, alumniId: alumni.id } },
+  });
+  if (existing) throw new SurveyResponseAlreadyExistsError(survey.id, alumni.id);
+  return tx.surveyResponse.create({ data: {
+    surveyId: survey.id, alumniId: alumni.id, referenceDegreeId: degree.id, confirmedAt: new Date(),
+  } });
 }
 
 /** Replace only an existing participation, using trusted installation configuration.

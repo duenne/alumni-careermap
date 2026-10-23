@@ -7,6 +7,11 @@ CareerStep, AlumniTimelineItem und das optionale AlumniContact bilden die zehn
 kanonischen Domänenentitäten. Es gibt keine Seed- oder Alumni-Daten.
 Die fachliche Quelle ist [`docs/architecture/MVP_DOMAIN_MODEL.md`](docs/architecture/MVP_DOMAIN_MODEL.md).
 
+## Repository-Dokumentation
+
+- [Architekturübersicht mit Komponentendiagrammen](docs/architecture/REPOSITORY_OVERVIEW.md): aktueller Arbeitsbaum, Oberfläche, Normalisierung, Domain-Services und Deployment.
+- [Datenmodell mit ER-Diagramm](docs/architecture/DATA_MODEL.md): alle zehn Tabellen, Kardinalitäten, Schlüssel, SQL-Constraints und Löschregeln.
+
 ## Voraussetzungen
 
 - Node.js 22.23.3 (lokal und CI über `.nvmrc`, Docker über den Image-Tag).
@@ -36,6 +41,12 @@ Für öffentliches Hosting ist HTTPS über die vorhandene Hosting-Infrastruktur
 einzurichten. Die Anwendung bindet auf dem Host zunächst nur an Loopback.
 
 ## Lokale Entwicklung und Prüfungen
+
+Der neue [vertikale JSON→Datenbank-Test](docs/testing/V1C_JSON_DATABASE_MAPPING.md)
+startet mit `npm run dev:mapping` unter `http://localhost:3104/dev/mapping`.
+Er unterstützt die lokale Phase-D-Auswahl und die LinkedIn-Rohvorschau, explizite
+Zuordnung/Referenzbestätigung und atomare Speicherung in einem separaten,
+beim Beenden entfernten PostgreSQL-17-Container.
 
 ```sh
 nvm install

@@ -1,0 +1,51 @@
+import { expect, test } from "@playwright/test";
+
+test("JSON -> reviewed schema -> PostgreSQL, confirmation gates and safe retry", async ({ page, request }) => {
+  await page.goto("/dev/mapping");
+  await expect(page.getByRole("heading", { name: "JSON auf das Datenbankschema abbilden" })).toBeVisible();
+  await page.getByRole("button", { name: "Beispiel laden" }).click();
+  const save = page.getByRole("button", { name: "In Testdatenbank speichern" });
+  await expect(save).toBeDisabled();
+  const degree = page.getByRole("group", { name: "Synthetic M.Sc.", exact: true });
+  await degree.getByLabel("Status", { exact: true }).selectOption("COMPLETED");
+  await degree.getByLabel("Studiengang oder Bildungseinrichtung", { exact: true }).selectOption({ label: "Studiengang: Synthetic Teststudium · Synthetic Mapping Institute" });
+  const course = page.getByRole("group", { name: "Synthetic Short Course", exact: true });
+  await course.getByLabel("Zieltyp").selectOption("CAREER_STEP:EDUCATION");
+  const reference = page.getByLabel("Konkreter Referenzabschluss", { exact: true });
+  await expect(reference).toHaveValue("");
+  await reference.selectOption({ label: "Synthetic M.Sc." });
+  await page.getByRole("checkbox", { name: /Diesen eigenen abgeschlossenen Degree/ }).check();
+  await expect(save).toBeDisabled();
+  await page.getByRole("checkbox", { name: /Ich habe Typen, Status/ }).check();
+  await expect(save).toBeEnabled();
+  let payload: unknown;
+  page.on("request", req => { if (req.method() === "POST" && req.url().endsWith("/api/dev/import/mapping")) payload = req.postDataJSON(); });
+  const response = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith("/api/dev/import/mapping"));
+  await save.click();
+  const saved = await (await response).json();
+  await expect(page.getByRole("heading", { name: "In PostgreSQL gespeichert" })).toBeVisible();
+  expect(saved.receipt).toMatchObject({ degrees: 1, careerSteps: 3, timelineItems: 4 });
+  await expect(save).toBeDisabled();
+  const retry = await request.post("/api/dev/import/mapping", { data: payload, headers: { Origin: "http://localhost:3104" } });
+  expect(await retry.json()).toEqual(saved);
+  await expect(page.locator("body")).not.toHaveText(/PRIVATE_SYNTHETIC_MARKER/);
+  expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `artifacts/v1c-mapping/${test.info().project.name}-saved.png`, fullPage: true });
+  await page.reload();
+  await expect(page.getByLabel("Snapshot-JSON oder rohe LinkedIn-Vorschau")).toHaveValue("");
+  await expect(page.getByRole("heading", { name: "In PostgreSQL gespeichert" })).toHaveCount(0);
+});
+
+test("replacing source invalidates every mapping and confirmation", async ({ page }) => {
+  await page.goto("/dev/mapping");
+  await page.getByRole("button", { name: "Beispiel laden" }).click();
+  await expect(page.getByRole("heading", { name: "2. Zuordnungen prüfen" })).toBeVisible();
+  await page.getByRole("checkbox", { name: /Ich habe Typen, Status/ }).check();
+  await page.getByLabel("Snapshot-JSON oder rohe LinkedIn-Vorschau").fill("{}");
+  await expect(page.getByRole("heading", { name: "2. Zuordnungen prüfen" })).toHaveCount(0);
+  await page.getByRole("button", { name: "JSON zuordnen" }).click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("keine unterstützte Snapshot-Struktur");
+  await page.getByRole("button", { name: "Beispiel laden" }).click();
+  await expect(page.getByRole("checkbox", { name: /Ich habe Typen, Status/ })).not.toBeChecked();
+});

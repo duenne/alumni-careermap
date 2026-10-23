@@ -1,5 +1,7 @@
 node_modules
 .next
+.next-mapping-test
+.local-fixtures
 .git
 coverage
 src/generated

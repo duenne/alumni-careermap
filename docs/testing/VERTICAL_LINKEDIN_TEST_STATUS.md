@@ -75,3 +75,28 @@ Screenshots und Testberichte gehören nicht zum Git-Commit. Lokale Nachweise lie
 unter `artifacts/v1b-snapshot-diagnostics/` und den zuvor dokumentierten
 Inkrementverzeichnissen. Separate lokale Architektur-Dokumentation und
 installierte Skill-Pakete werden durch diesen Commit nicht verändert.
+
+## Lokaler Nachtrag vom 23.10.2026 – noch nicht veröffentlicht
+
+Der Live-Fehler wurde mit der sicheren Diagnose auf `EDUCATION`, Seite 2,
+HTTP 404 eingegrenzt. Ein zu enger Matcher erkannte nur den Wortlaut
+`No data found for this memberId`. Die Varianten ohne `this` beziehungsweise
+mit `member id` reproduzierten den 502 mit synthetischen Antworten.
+Die lokale Korrektur erkennt diese No-data-Varianten; unbekannte 404 bleiben
+Fehler. Der echte Antworttext wurde nicht gelesen, die manuelle Live-Abnahme
+steht weiterhin aus.
+
+Erneut erfolgreich: 859 Unit-Tests, acht gezielte OAuth-Browserprüfungen,
+Lint, Typecheck und Produktionsbuild. Die übrigen Browser- und Datenbankprüfungen
+wurden für diese einzelne Matcher-Korrektur nicht wiederholt.
+Details und Artefakte stehen im neuen Nachtrag der
+[V1b-Abnahmeanleitung](V1B_LINKEDIN_OAUTH_ACCEPTANCE.md).
+Diese Änderungen wurden nicht zusätzlich committet oder gepusht.
+
+Ein weiterer lokaler Nachtrag ergänzt auf ausdrücklichen Nutzerwunsch die
+[temporäre Rohvorschau](V1B_RAW_SNAPSHOT_PREVIEW.md). Sie zeigt vor der
+Normalisierung bis zu zwei Antworten pro Karriere-Domäne einschließlich der
+unbekannten 404. Keine Speicherung oder Review-Freigabe echter Daten.
+Aktuelle lokale Prüfungen: 866 Unit-Tests, 42 Browserprüfungen, Lint, Typecheck
+und Produktionsbuild erfolgreich. Auch dieser Stand wurde nicht neu committet
+oder gepusht; der Live-Snapshot-Fehler gilt noch nicht als behoben.

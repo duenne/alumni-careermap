@@ -15,6 +15,7 @@ type Session = {
   showTimeline: boolean;
   error: string | null;
   reviewSourceKey?: string;
+  raw?: boolean;
 };
 const emptySession = (): Session => ({ json: "", origin: "empty", validated: null, showTimeline: false, error: null });
 type Connection = { configured: boolean; connected: boolean; configurationIssue: "NOT_CONFIGURED" | "ORIGIN_MISMATCH" | null };
@@ -64,20 +65,25 @@ export default function ImportEditor() {
     if (!response.ok) throw new Error();
     setConnection(current => ({ ...current, connected: false }));
   }
-  async function fetchSnapshot() {
+  async function fetchSnapshot(raw = false) {
     const requestId = ++sequence.current;
     snapshotRequest.current?.abort();
     const controller = new AbortController();
     snapshotRequest.current = controller;
     setSession(emptySession()); setConnectionError(null); setSnapshotDiagnostic(null); setReading(true);
     try {
-      const response = await fetch("/api/dev/import/linkedin/snapshot", { method: "POST", cache: "no-store", signal: controller.signal });
+      const response = await fetch(`/api/dev/import/linkedin/${raw ? "raw-snapshot" : "snapshot"}`, { method: "POST", cache: "no-store", signal: controller.signal });
       const data = await response.json();
       if (requestId !== sequence.current) return;
       if (!response.ok || response.status === 202) {
         setConnectionError(portabilityMessage(data.code));
         setSnapshotDiagnostic(snapshotDiagnosticLabel(data.diagnostic));
         if (response.status === 401 || response.status === 403) setConnection(current => ({ ...current, connected: false }));
+        return;
+      }
+      if (raw) {
+        if (data.source !== "linkedin-raw" || data.dump?.kind !== "linkedin-raw-preview" || data.dump.complete !== false) throw new Error();
+        setSession({ ...emptySession(), json: JSON.stringify(data.dump, null, 2), origin: "linkedin", raw: true });
         return;
       }
       const result = parseEditor(JSON.stringify(data.snapshot));
@@ -96,6 +102,7 @@ export default function ImportEditor() {
     setSession(current => ({ ...emptySession(), json, origin: current.origin === "linkedin" ? "linkedin" : "custom" }));
   }
   function validate() {
+    if (session.raw) return;
     const result = parseEditor(session.json);
     if (!result.ok) {
       setSession(current => ({ ...current, validated: null, showTimeline: false, error: result.message }));
@@ -142,6 +149,7 @@ export default function ImportEditor() {
     <p className="eyebrow">Lokale Entwicklungsansicht · LinkedIn-Testimport</p>
     <h1>LinkedIn-Testimport</h1>
     <p>Temporäre Vorschau ohne Datenspende. Hier werden keine Profile gespeichert.</p>
+    <p>Weiterer Entwicklungsschritt: <a href="http://localhost:3104/dev/mapping">JSON auf das Datenbankschema abbilden</a> (separater Server mit <code>npm run dev:mapping</code>).</p>
     <section aria-labelledby="source-heading" className={styles.section}>
       <h2 id="source-heading">LinkedIn-Datenquelle</h2>
       <p>{connectionLoading ? "Verbindungsstatus wird geprüft." : connection.connected ? "Mit LinkedIn verbunden · nur temporär auf diesem Entwicklungsserver." : connection.configured ? "HM CareerMap ist lokal konfiguriert. Noch nicht verbunden." : connection.configurationIssue === "ORIGIN_MISMATCH" ? "Diese Browseradresse passt nicht zur konfigurierten Callback-URL." : "LinkedIn-Konfiguration fehlt oder ist ungültig."}</p>
@@ -165,22 +173,24 @@ export default function ImportEditor() {
         <form method="post" action="/api/dev/import/linkedin/start" onSubmit={() => { sequence.current++; snapshotRequest.current?.abort(); setSession(emptySession()); }}>
           <button type="submit" disabled={!connection.configured || connectionLoading || reading || loading}>Mit LinkedIn verbinden</button>
         </form>
-        <button type="button" onClick={fetchSnapshot} disabled={!connection.connected || reading || loading}>Karrieredaten abrufen</button>
+        <button type="button" onClick={() => fetchSnapshot()} disabled={!connection.connected || reading || loading}>Karrieredaten abrufen</button>
+        <button type="button" onClick={() => fetchSnapshot(true)} disabled={!connection.connected || reading || loading}>Rohe API-Antworten abrufen</button>
       </div>
-      {reading && <p role="status">EDUCATION und POSITIONS werden vollständig abgerufen.</p>}
+      <p>Rohabruf: höchstens zwei Antworten je Domäne einschließlich HTTP-Fehlern, ohne Konvertierung. Die begrenzte Diagnosevorschau ist kein vollständiger Import. Nur vorübergehend ansehen; nicht exportieren oder in Screenshots, Logs oder Testdateien übernehmen.</p>
+      {reading && <p role="status">EDUCATION und POSITIONS werden abgerufen.</p>}
       {connectionError && <p role="alert">{connectionError}</p>}
       {snapshotDiagnostic && <p>{snapshotDiagnostic}</p>}
     </section>
     <section aria-labelledby="json-heading" className={styles.section}>
       <h2 id="json-heading">JSON-Editor</h2>
-      <p id="json-hint">Nur Arbeitsspeicher dieser Seite. Keine Übertragung der Eingabe an den Server, kein automatisches Speichern. Neu laden verwirft den Entwurf. PROFILE bleibt nach Prüfung leer; nicht benötigte Felder werden entfernt.</p>
+      <p id="json-hint">Nur Arbeitsspeicher dieser Seite. Keine Übertragung der Eingabe an den Server, kein automatisches Speichern. Neu laden verwirft den Entwurf. {session.raw ? "Rohantworten enthalten persönliche Quellfelder und werden nur zur lokalen Diagnose angezeigt. Zugangsdaten und Header-Echos sind entfernt." : "PROFILE bleibt nach Prüfung leer; nicht benötigte Felder werden entfernt."}</p>
       <label htmlFor="career-json">Temporäres Karriere-JSON</label>
       <textarea id="career-json" ref={editor} value={session.json} onChange={event => edit(event.target.value)}
-        rows={15} maxLength={200_001} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="off"
+        rows={15} readOnly={!!session.raw} maxLength={session.raw ? undefined : 200_001} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="off"
         aria-invalid={!!session.error} aria-describedby={session.error ? "json-hint json-error" : "json-hint"} />
       {session.error && <p id="json-error" role="alert">{session.error}</p>}
       <div className={styles.actions}>
-        <button type="button" onClick={validate} disabled={loading || !session.json}>JSON prüfen</button>
+        <button type="button" onClick={validate} disabled={loading || !session.json || session.raw}>JSON prüfen</button>
         <button type="button" onClick={clear}>Vorschau leeren</button>
       </div>
       <label htmlFor="synthetic-fixture">Synthetischer Datensatz</label>
@@ -191,6 +201,7 @@ export default function ImportEditor() {
       <button type="button" onClick={replace} disabled={loading || connectionLoading}>Synthetische Testdaten verwenden</button>
       <p role="status">{loading ? "Synthetische Testdaten werden geladen." : session.origin === "synthetic"
         ? "Synthetische Testdaten" : session.origin === "linkedin" ? "LinkedIn-Daten – nur temporäre Vorschau" : session.origin === "custom" ? "Eigene JSON-Eingabe – nur temporäre Vorschau" : "Noch keine Daten geladen."}</p>
+      {session.raw && <p>Rohantworten · unvollständige Diagnosevorschau · ohne Konvertierung</p>}
       {session.validated && <>
         <p>{session.validated.counts.education} Ausbildungsangaben · {session.validated.counts.positions} Berufsangaben</p>
         <p>{session.validated.result.stations.length} Quellangaben geprüft. Ihre fachliche Einordnung bleibt offen.</p>

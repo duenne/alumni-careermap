@@ -1,6 +1,9 @@
 node_modules/
 .next/
 .next-import-test/
+.next-mapping-test/
+playwright-report-mapping/
+test-results-mapping/
 coverage/
 src/generated/
 .env*

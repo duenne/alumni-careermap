@@ -122,6 +122,16 @@ for (const validState of [true, false]) {
       expect(after?.value).not.toBe(before?.value);
       await page.reload();
       await expect(page.getByRole("button", { name: "Karrieredaten abrufen", exact: true })).toBeEnabled();
+      const rawResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/dev/import/linkedin/raw-snapshot");
+      await page.getByRole("button", { name: "Rohe API-Antworten abrufen", exact: true }).click();
+      expect((await rawResponse).status()).toBe(200);
+      const rawEditor = page.getByLabel("Temporäres Karriere-JSON", { exact: true });
+      await expect(rawEditor).toHaveValue(/synthetic-member/);
+      const raw = JSON.parse(await rawEditor.inputValue());
+      expect(raw.complete).toBe(false);
+      expect(raw.domains.map((domain: { pages: { status: number }[] }) => domain.pages.map(page => page.status))).toEqual([[200, 404], [200, 404]]);
+      await expect(rawEditor).toHaveAttribute("readonly", "");
+      await expect(page.getByRole("button", { name: "In Karriereansicht übernehmen", exact: true })).toBeDisabled();
       const snapshotResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/dev/import/linkedin/snapshot");
       await page.getByRole("button", { name: "Karrieredaten abrufen", exact: true }).click();
       expect((await snapshotResponse).status()).toBe(200);

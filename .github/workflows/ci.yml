@@ -31,6 +31,7 @@ jobs:
       - run: npx playwright test
       - run: npm run test:e2e:import
       - run: npm run test:e2e:oauth
+      - run: npm run test:e2e:mapping
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -42,4 +43,6 @@ jobs:
             test-results-v1a/
             playwright-report-oauth/
             test-results-oauth/
+            playwright-report-mapping/
+            test-results-mapping/
           retention-days: 14

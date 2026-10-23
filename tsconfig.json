@@ -35,7 +35,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".next-import-test/types/**/*.ts",
-    ".next-import-test/dev/types/**/*.ts"
+    ".next-import-test/dev/types/**/*.ts",
+    ".next-mapping-test/types/**/*.ts",
+    ".next-mapping-test/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

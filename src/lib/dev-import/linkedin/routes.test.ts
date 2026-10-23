@@ -24,6 +24,7 @@ function setup() {
     authorizationUrl: vi.fn(state => `https://www.linkedin.com/oauth/v2/authorization?state=${state}`),
     exchange: vi.fn(async () => ({ accessToken: "synthetic-token", expiresIn: 3600 })),
     snapshot: vi.fn(async () => projectSnapshot(fixture)),
+    rawSnapshot: vi.fn(async () => ({ kind: "linkedin-raw-preview" as const, complete: false as const, domains: [] })),
   };
   const store = new EphemeralLinkedInSessions();
   return { provider, store, ...createLinkedInHandlers({ config: () => config, provider: () => provider, store }) };
@@ -50,6 +51,37 @@ async function connect(app: ReturnType<typeof setup>) {
 }
 
 describe("V1b OAuth routes and temporary server sessions", () => {
+  it("serves an authenticated raw preview without normalizing and denies unauthenticated, CSRF and production access", async () => {
+    const app = setup();
+    expect((await app.POST(request("raw-snapshot", "POST"))).status).toBe(401);
+    const cookie = await connect(app);
+    const response = await app.POST(request("raw-snapshot", "POST", cookie));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ source: "linkedin-raw", dump: { kind: "linkedin-raw-preview", complete: false, domains: [] } });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(app.provider.snapshot).not.toHaveBeenCalled();
+    expect(app.provider.rawSnapshot).toHaveBeenCalledOnce();
+    expect((await app.POST(request("raw-snapshot", "POST", cookie, "", { origin: "https://external.invalid" }))).status).toBe(404);
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await app.POST(request("raw-snapshot", "POST", cookie))).status).toBe(404);
+  });
+
+  it("discards an in-flight raw dump after disconnect or fixture replacement", async () => {
+    const app = setup();
+    const cookie = await connect(app);
+    let release!: () => void;
+    const wait = new Promise<void>(resolve => { release = resolve; });
+    vi.mocked(app.provider.rawSnapshot).mockImplementation(async (_token, signal) => {
+      await wait;
+      expect(signal?.aborted).toBe(true);
+      return { kind: "linkedin-raw-preview", complete: false, domains: [] };
+    });
+    const pending = app.POST(request("raw-snapshot", "POST", cookie));
+    await app.POST(request("disconnect", "POST", cookie));
+    release();
+    expect((await pending).status).toBe(401);
+  });
   it("returns only allowlisted snapshot diagnostics, never raw fields, bodies or provider exception text", async () => {
     const app = setup();
     const cookie = await connect(app);

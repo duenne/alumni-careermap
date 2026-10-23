@@ -437,3 +437,64 @@ Manuell: `/dev/import` vollständig neu laden, bei Bedarf erneut verbinden und
 Editor und werden weiterhin erst nach vollständigem Fixture-Austausch für die
 Karriereansicht freigegeben. Die tatsächliche Live-Ursache und erfolgreiche
 Live-Abnahme bleiben bis zu dieser Rückmeldung offen.
+
+## Nachprüfung vom 23.10.2026: No-data-Erkennung am Seitenende
+
+Der Nutzer meldete ausschließlich die sichere Diagnose
+`EDUCATION · Seite 2 · HTTP_STATUS · HTTP 404`.
+Damit ist die Ablehnung auf die zweite angefragte EDUCATION-Seite eingegrenzt.
+Der Antworttext wurde nicht gelesen; ein 404 allein beweist kein reguläres Ende.
+Die offizielle Snapshot-Dokumentation beschreibt das Weiterblättern bis zur
+No-data-Meldung, unabhängig von `paging.total`.
+
+Im Code war die Enderkennung unnötig eng an den Wortlaut
+`No data found for this memberId` gebunden. Neu verfasste synthetische Antworten
+ohne `this` beziehungsweise mit `member id` und abweichenden Leerzeichen
+reproduzierten den 502 im vollständigen Browserablauf. Das ist eine plausible
+Erklärung für den Live-Befund; dessen genauer Wortlaut bleibt unbekannt.
+
+Minimal geändert wurde nur der Matcher in `src/lib/dev-import/linkedin/provider.ts`:
+Er erkennt die No-data-Formulierung am Textanfang mit optionalem `this`,
+variabler Leerraumsetzung und `memberId`/`member id`, ohne Quellwerte auszugeben.
+Nach gültigen Seiten wird eine so erkannte 404-Antwort als Ende behandelt und
+mit POSITIONS fortgefahren. Dieselbe Antwort auf der ersten Seite bleibt
+`SNAPSHOT_PENDING`. Unbekannte 404-Fehler bleiben Fehler; vorhandene Seiten werden
+dann weiterhin nicht als vollständiger Import freigegeben. Paging-, Größen- und
+Sicherheitsgrenzen, Adapter und Domänenmodell bleiben unverändert.
+
+RED: Vier Unit-Fälle scheiterten an den No-data-Varianten; der vollständige
+Snapshot-Browserablauf lieferte in beiden Viewports 502 statt 200.
+GREEN: 859 Unit-Tests und alle acht gezielten OAuth-Browserprüfungen erfolgreich,
+einschließlich Snapshot-Projektion, Editor und vollständigem Fixture-Austausch.
+Lint, Typecheck, Produktionsbuild und `git diff --check` erfolgreich.
+Die übrigen V0-/Import-Browserfälle und Datenbankprüfungen wurden für die einzelne
+Matcher-Korrektur nicht wiederholt. Kein automatisierter Live-Abruf fand statt.
+
+Neben dem Matcher wurden `provider.test.ts` und die ausschließlich synthetischen
+Seitenende-Antworten in `tests/support/linkedin-token-mock.mjs` angepasst.
+Dieser lokale Nachtrag und `VERTICAL_LINKEDIN_TEST_STATUS.md` dokumentieren den
+Stand auf `feat/vertical-test-linkedin` nach `11661b3`. Kein weiterer Commit,
+Push oder Merge wurde vorgenommen; übrige lokale Änderungen bleiben erhalten.
+
+Nachweise unter `artifacts/v1b-snapshot-pagination-end/`: `red-unit.log`,
+`red-browser.log`, `unit.log`, `browser.log`, `lint.log`, `typecheck.log`,
+`build.log`, `red-browser-artifacts/` sowie `oauth-report/index.html`.
+RED-Screenshots und -Traces enthalten ausschließlich synthetische Testzustände.
+
+Manuell: `http://localhost:3100/dev/import` neu laden, bei Bedarf erneut verbinden
+und **Karrieredaten abrufen** wählen. Erwartung für die neu erkannten
+No-data-Antworten: kein 502, stattdessen das JSON mit Ausbildungs- und Berufsangaben.
+Die Live-Abnahme und die Vollständigkeit des eigenen Profils bleiben manuell zu
+bestätigen. Falls dieselbe Diagnose bleibt, ist der echte 404 weiterhin unbekannt;
+keine persönlichen Rohdaten oder Screenshots dafür teilen.
+
+## Separater Rohabruf auf ausdrücklichen Nutzerwunsch
+
+Zur weiteren Untersuchung gibt es jetzt **Rohe API-Antworten abrufen** in
+`/dev/import`. Dieser getrennte Entwicklungspfad zeigt JSON-Bodies einschließlich
+HTTP-Fehlern vor jeder fachlichen Projektion. Die früher geltende Beschränkung auf
+die fachliche Projektion wird ausschließlich für diese temporäre, vom Nutzer
+ausdrücklich angeforderte lokale Diagnose erweitert. Tokens, Logs, Dateien,
+Persistenz und Review-Freigabe bleiben ausgeschlossen.
+Bedienung, Grenzen und neue Prüfergebnisse stehen in
+[V1B_RAW_SNAPSHOT_PREVIEW.md](V1B_RAW_SNAPSHOT_PREVIEW.md).

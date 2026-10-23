@@ -29,7 +29,9 @@ globalThis.fetch = async (input, options) => {
     if (url.searchParams.get("q") !== "criteria" || !["EDUCATION", "POSITIONS"].includes(domain)) {
       throw new Error("Unexpected snapshot domain in the isolated provider mock.");
     }
-    if (url.searchParams.get("start") === "1") return Response.json({ message: "No data found for this memberId" }, { status: 404 });
+    if (url.searchParams.get("start") === "1") return Response.json({
+      message: domain === "EDUCATION" ? "No data found for memberId: synthetic-member" : "No data found for this member id: synthetic-member",
+    }, { status: 404 });
     if (url.searchParams.get("start") !== "0") throw new Error("Unexpected snapshot page in the isolated provider mock.");
     const element = structuredClone(fixture.elements.find(element => element.snapshotDomain === domain));
     if (domain === "POSITIONS") element.snapshotData[0].Title = "Synthetic Provider Snapshot Role";

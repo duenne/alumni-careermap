@@ -20,6 +20,12 @@ const page = (domain: string, start = 0, next?: string) => Response.json({
   paging: { start, count: 10, total: 1, links: next ? [{ rel: "next", href: next }] : [] },
 });
 const end = () => Response.json({ message: "No data found for this memberId" }, { status: 404 });
+const endMessages = [
+  "No data found for this domain and memberId.",
+  "No data found for this memberId",
+  "No data found for memberId: synthetic-member",
+  "  NO  DATA\nFOUND for this member id: synthetic-member  ",
+];
 
 describe("V1b official portability provider (synthetic HTTP responses only)", () => {
   it("distinguishes response size, JSON syntax and paging failures using content-free diagnostics", async () => {
@@ -97,9 +103,24 @@ describe("V1b official portability provider (synthetic HTTP responses only)", ()
     try { await createLinkedInProvider(config(), vi.fn<typeof fetch>().mockResolvedValue(Response.json({ message: "PRIVATE_SYNTHETIC_MARKER" }, { status }))).snapshot("synthetic-token"); }
     catch (error) { expect(String(error)).not.toMatch(/PRIVATE_SYNTHETIC_MARKER|synthetic-token/); }
   });
-  it("treats an initially missing snapshot as pending, not as proof of account ineligibility", async () => {
-    await expect(createLinkedInProvider(config(), vi.fn<typeof fetch>().mockResolvedValue(end())).snapshot("synthetic-token"))
+  it.each(endMessages)("treats an initially missing snapshot as pending without exposing its no-data message: %#", async message => {
+    await expect(createLinkedInProvider(config(), vi.fn<typeof fetch>().mockResolvedValue(Response.json({ message }, { status: 404 }))).snapshot("synthetic-token"))
       .rejects.toMatchObject({ code: "SNAPSHOT_PENDING" });
+  });
+  it.each(endMessages)("recognizes a no-data 404 after valid pages and continues with the other career domain: %#", async message => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(page("EDUCATION"))
+      .mockResolvedValueOnce(Response.json({ message }, { status: 404 }))
+      .mockResolvedValueOnce(page("POSITIONS"))
+      .mockResolvedValueOnce(Response.json({ message }, { status: 404 }));
+    const result = await createLinkedInProvider(config(), fetcher).snapshot("synthetic-token");
+    expect(result.elements.map(element => [element.snapshotDomain, element.snapshotData.length])).toEqual([
+      ["PROFILE", 1], ["POSITIONS", 1], ["EDUCATION", 1],
+    ]);
+    expect(JSON.stringify(result)).not.toContain("synthetic-member");
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).searchParams.get("domain"))).toEqual([
+      "EDUCATION", "EDUCATION", "POSITIONS", "POSITIONS",
+    ]);
   });
   it("does not turn an unrelated later 404 into a completed or pending snapshot", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(page("EDUCATION"))
