@@ -80,7 +80,17 @@ export function sourceRows(snapshot: SnapshotProjection) {
   })));
 }
 
-/** Editable hints only. No academic completion or ongoing activity is inferred. */
+/** Requested UI defaults, not a confirmed award or catalog identity. A precise
+ * attendance end proposes completion; the user must review it before saving.
+ * Missing/imprecise end dates never imply an ongoing or completed station.
+ */
+export function suggestedReviewFields(source: { end: string; provider: string }, classification: string): Pick<ImportReview, "status" | "catalog"> {
+  const end = /^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) )?([0-9]{4})$/.exec(cleanText(source.end));
+  return { status: end && Number(end[1]) > 0 ? classification.startsWith("DEGREE:") ? "COMPLETED" : "ENDED" : "UNKNOWN",
+    catalog: cleanText(source.provider) ? "CREATE" : "UNKNOWN" };
+}
+
+/** Editable proposals only; confirmation and reference selection stay explicit. */
 export function suggestReviews(snapshot: SnapshotProjection): ImportReview[] {
   return sourceRows(snapshot).map((source, index) => {
     const title = source.title;
@@ -94,7 +104,7 @@ export function suggestReviews(snapshot: SnapshotProjection): ImportReview[] {
     else if (/\b(founder|self.employed|freelance|selbst)/i.test(title)) classification = "CAREER_STEP:SELF_EMPLOYMENT";
     else if (/\b(volunteer|ehrenamt)/i.test(title)) classification = "CAREER_STEP:VOLUNTEERING";
     else classification = "CAREER_STEP:EMPLOYMENT";
-    return { sourceKey: source.sourceKey, classification, status: "UNKNOWN", position: index + 1, catalog: "UNKNOWN" };
+    return { sourceKey: source.sourceKey, classification, position: index + 1, ...suggestedReviewFields(source, classification) };
   });
 }
 

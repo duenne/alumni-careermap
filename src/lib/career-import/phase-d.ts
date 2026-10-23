@@ -1,4 +1,4 @@
-import { CareerImportError, cleanText, readCareerSnapshot, sourceRows, suggestReviews } from "./mapping";
+import { CareerImportError, cleanText, readCareerSnapshot, sourceRows, suggestReviews, suggestedReviewFields } from "./mapping";
 
 type PhaseDStation = { stationId: string; stationType: string; titleRaw: string; organisationRaw: string; degreeLevel?: string; employmentForm?: string; chronologyIndex: number; isCurrent: boolean };
 export type PhaseDExpected = { syntheticId: string; stations: PhaseDStation[]; msiAnchor: { stationId: string } };
@@ -26,8 +26,9 @@ export function phaseDExample(snapshot: unknown, expected: PhaseDExpected) {
       const types: Record<string, string> = { EMPLOYED: "EMPLOYMENT", SELF_EMPLOYED: "SELF_EMPLOYMENT", VOLUNTEER: "VOLUNTEERING", INTERNSHIP: "INTERNSHIP" };
       review.classification = types[station.employmentForm ?? ""] ? `CAREER_STEP:${types[station.employmentForm!]}` : "";
     }
-    // isCurrent=false is not evidence of an award. All statuses require review.
-    review.status = "UNKNOWN";
+    // Proposal only, using the final hinted classification. isCurrent/anchor
+    // do not establish completion or confirm a reference.
+    Object.assign(review, suggestedReviewFields(source, review.classification));
     if (station.stationId === expected.msiAnchor.stationId) candidateSourceKey = source.sourceKey;
   }
   if (used.size !== rows.length || !candidateSourceKey) throw new CareerImportError("INVALID_SOURCE");

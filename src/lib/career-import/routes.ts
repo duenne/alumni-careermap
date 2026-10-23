@@ -5,6 +5,7 @@ import { allowDevImport } from "../dev-import/access";
 import { fixtureOptions, loadMappingFixture } from "./local-fixtures";
 import { CareerImportError, uuid } from "./mapping";
 import { saveCareerImport, type ImportReceipt } from "./service";
+import { listSavedCareers, readSavedCareer } from "./saved-career";
 
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY" };
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers });
@@ -24,17 +25,24 @@ export function createMappingHandlers(deps: { client: () => Promise<PrismaClient
         const client = await deps.client();
         const institutionId = process.env.CAREERMAP_MAPPING_OPERATOR_ID;
         if (!uuid(institutionId)) throw new Error();
-        const [surveys, institutions, programs, organisations, fixtures] = await Promise.all([
+        const responseId = new URL(request.url).searchParams.get("saved");
+        if (responseId) {
+          if (!uuid(responseId)) return json({ code: "INVALID_REQUEST" }, 400);
+          const profile = await readSavedCareer(client, responseId, institutionId);
+          return profile ? json({ profile }) : json({ code: "NOT_FOUND" }, 404);
+        }
+        const [surveys, institutions, programs, organisations, fixtures, savedProfiles] = await Promise.all([
           client.survey.findMany({ where: { referenceProgram: { institutionId }, status: "OPEN" }, include: { referenceProgram: { include: { institution: true } } } }),
           client.institution.findMany({ select: { id: true, name: true }, take: 200 }),
           client.program.findMany({ select: { id: true, name: true, institution: { select: { name: true } } }, take: 200 }),
-          client.organisation.findMany({ select: { id: true, name: true }, take: 200 }), fixtureOptions(),
+          client.organisation.findMany({ select: { id: true, name: true }, take: 200 }), fixtureOptions(), listSavedCareers(client, institutionId),
         ]);
-        return json({ surveys, institutions, programs, organisations, fixtures });
+        return json({ surveys, institutions, programs, organisations, fixtures, savedProfiles, storage: process.env.CAREERMAP_WORKFLOW_STORAGE === "PERSISTENT" ? "PERSISTENT" : "TEMPORARY" });
       } catch { return json({ code: "SANDBOX_UNAVAILABLE" }, 503); }
     },
     async POST(request: Request) {
-      if (!allowed(request) || request.headers.get("origin") !== new URL(request.url).origin) return json({ code: "UNAVAILABLE" }, 404);
+      const requestOrigin = `${new URL(request.url).protocol}//${request.headers.get("host")}`;
+      if (!allowed(request) || request.headers.get("origin") !== requestOrigin) return json({ code: "UNAVAILABLE" }, 404);
       try {
         if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) return json({ code: "INVALID_REQUEST" }, 400);
         const reader = request.body.getReader(); const chunks: Uint8Array[] = []; let bytes = 0;
@@ -62,7 +70,11 @@ export function createMappingHandlers(deps: { client: () => Promise<PrismaClient
           submissions.set(body.submissionId, { digest, expires: Date.now() + 15 * 60_000, pending });
           pending.catch(() => submissions.delete(body.submissionId));
         }
-        return json({ receipt: await pending });
+        const receipt = await pending;
+        const institutionId = process.env.CAREERMAP_MAPPING_OPERATOR_ID!;
+        const profile = await readSavedCareer(await deps.client(), receipt.responseId, institutionId);
+        if (!profile) throw new Error();
+        return json({ receipt, profile });
       } catch (error) {
         return json({ code: error instanceof CareerImportError ? error.code : "SAVE_FAILED" }, error instanceof CareerImportError || error instanceof SyntaxError ? 400 : 503);
       }

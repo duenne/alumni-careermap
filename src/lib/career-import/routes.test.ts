@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("./service", () => ({ saveCareerImport: vi.fn() }));
+vi.mock("./saved-career", () => ({ readSavedCareer: vi.fn(), listSavedCareers: vi.fn() }));
 import { createMappingHandlers } from "./routes";
 import { validateMappingDatabaseUrl } from "./sandbox";
 import { saveCareerImport } from "./service";
 import type { PrismaClient } from "../../generated/prisma/client";
+import { readSavedCareer } from "./saved-career";
 
 beforeEach(() => { vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("CAREERMAP_DEV_IMPORT", "1"); vi.stubEnv("CAREERMAP_DEV_MAPPING", "1"); });
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
@@ -28,16 +30,23 @@ it("accepts only a dedicated loopback mapping database, never a general DATABASE
     expect(() => validateMappingDatabaseUrl(url)).toThrow("Mapping sandbox configuration required");
   }
 });
+it("uses the gated Host spelling when Next normalizes a 127.0.0.1 request URL to localhost", async () => {
+  const app = createMappingHandlers({ client: vi.fn() });
+  const req = new Request("http://localhost:3105/api/dev/import/mapping", { method: "POST", headers: { host: "127.0.0.1:3105", origin: "http://127.0.0.1:3105", "content-type": "application/json" }, body: "{}" });
+  expect((await app.POST(req)).status).toBe(400);
+});
 it("serializes concurrent/retried submissions and refuses a changed payload under the same submission ID", async () => {
   vi.stubEnv("CAREERMAP_MAPPING_OPERATOR_ID", "00000000-0000-4000-8000-000000000001");
   const client = vi.fn(async () => ({} as PrismaClient));
   const save = vi.mocked(saveCareerImport);
   const receipt = { alumniId: "synthetic-new-id", responseId: "synthetic-response", degrees: 1, careerSteps: 0, timelineItems: 1 };
   save.mockResolvedValue(receipt);
+  const profile = { responseId: receipt.responseId, stations: [] } as unknown as Awaited<ReturnType<typeof readSavedCareer>>;
+  vi.mocked(readSavedCareer).mockResolvedValue(profile);
   const app = createMappingHandlers({ client });
   const body = { submissionId: "00000000-0000-4000-8000-000000000002", input: { synthetic: true } };
   const results = await Promise.all([app.POST(request("POST", body)), app.POST(request("POST", body))]);
-  expect(await results[0].json()).toEqual({ receipt }); expect(await results[1].json()).toEqual({ receipt });
+  expect(await results[0].json()).toEqual({ receipt, profile }); expect(await results[1].json()).toEqual({ receipt, profile });
   expect(save).toHaveBeenCalledOnce();
   expect((await app.POST(request("POST", { ...body, input: { changed: true } }))).status).toBe(409);
 });

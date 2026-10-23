@@ -5,6 +5,7 @@ import { saveCareerImport } from "../../src/lib/career-import/service";
 import { readCareerSnapshot } from "../../src/lib/career-import/mapping";
 import { phaseDExample, type PhaseDExpected } from "../../src/lib/career-import/phase-d";
 import { readFile } from "node:fs/promises";
+import { readSavedCareer, listSavedCareers } from "../../src/lib/career-import/saved-career";
 
 const writer = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 const reader = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
@@ -64,6 +65,20 @@ describe("reviewed JSON -> committed PostgreSQL profile", () => {
     await expect(saveCareerImport(writer, input(), config())).rejects.toThrow();
     expect(await writer.alumni.count()).toBe(count);
     await writer.survey.update({ where: { id: surveyId }, data: { status: "OPEN" } });
+  });
+  it("reads committed titles, catalogs, reference and manual order, scoped to the configured operator", async () => {
+    const value = input();
+    value.snapshot = structuredClone(snapshot);
+    value.snapshot.elements[1].snapshotData[0].Title = "Synthetic edited developer";
+    const receipt = await saveCareerImport(writer, value, config()); created.push(receipt.alumniId);
+    value.snapshot.elements[1].snapshotData[0].Title = "UNSAVED_DRAFT_MARKER";
+    const saved = await readSavedCareer(reader, receipt.responseId, institutionId);
+    expect(saved?.stations.map(row => [row.position, row.title])).toEqual([[1, "Synthetic B.Sc."], [3, "Synthetic edited developer"]]);
+    expect(saved?.stations[0]).toMatchObject({ reference: true, program: "Synthetic mapping program", status: "COMPLETED" });
+    expect(saved?.stations[1]).toMatchObject({ provider: "Synthetic employer", location: "Synthetic town", status: "ONGOING" });
+    expect(JSON.stringify(saved)).not.toContain("UNSAVED_DRAFT_MARKER");
+    expect((await listSavedCareers(reader, institutionId)).some(row => row.responseId === receipt.responseId)).toBe(true);
+    expect(await readSavedCareer(reader, receipt.responseId, "00000000-0000-4000-8000-000000000999")).toBeNull();
   });
   it.skipIf(process.env.CAREERMAP_PHASE_D_FIXTURES !== "1")("round-trips all 100 local examples / 432 stations against independent companion years and ordering", async () => {
     const sources = JSON.parse(await readFile(".local-fixtures/phase-d/all_linkedin_snapshots.json", "utf8")) as { syntheticId: string; snapshot: unknown }[];

@@ -1,0 +1,20 @@
+name: careermap-workflow
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: careermap_workflow_test
+      POSTGRES_USER: careermap
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD setzen}
+    ports:
+      - "127.0.0.1:${CAREERMAP_WORKFLOW_DB_PORT:-5433}:5432"
+    volumes:
+      - workflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careermap -d careermap_workflow_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+volumes:
+  workflow_data:

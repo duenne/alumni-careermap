@@ -5,17 +5,30 @@ test("JSON -> reviewed schema -> PostgreSQL, confirmation gates and safe retry",
   await expect(page.getByRole("heading", { name: "JSON auf das Datenbankschema abbilden" })).toBeVisible();
   await page.getByRole("button", { name: "Beispiel laden" }).click();
   const save = page.getByRole("button", { name: "In Testdatenbank speichern" });
-  await expect(save).toBeDisabled();
+  let submissions = 0;
+  page.on("request", req => { if (req.method() === "POST" && req.url().endsWith("/api/dev/import/mapping")) submissions++; });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(page.locator("#kind-3")).toBeFocused();
+  expect(submissions).toBe(0);
   const degree = page.getByRole("group", { name: "Synthetic M.Sc.", exact: true });
-  await degree.getByLabel("Status", { exact: true }).selectOption("COMPLETED");
-  await degree.getByLabel("Studiengang oder Bildungseinrichtung", { exact: true }).selectOption({ label: "Studiengang: Synthetic Teststudium · Synthetic Mapping Institute" });
-  const course = page.getByRole("group", { name: "Synthetic Short Course", exact: true });
-  await course.getByLabel("Zieltyp").selectOption("CAREER_STEP:EDUCATION");
+  await expect(degree.getByLabel("Status", { exact: true })).toHaveValue("COMPLETED");
+  await expect(degree.getByLabel("Studiengang oder Bildungseinrichtung")).toHaveValue("CREATE");
+  const internship = page.getByRole("group", { name: "Synthetic Internship", exact: true });
+  await expect(internship.getByLabel("Status", { exact: true })).toHaveValue("ENDED");
+  await expect(internship.getByLabel("Organisation", { exact: true })).toHaveValue("CREATE");
   const reference = page.getByLabel("Konkreter Referenzabschluss", { exact: true });
   await expect(reference).toHaveValue("");
+  // The reference is selectable before the unrelated short course is resolved.
   await reference.selectOption({ label: "Synthetic M.Sc." });
+  await expect(degree.getByLabel("Studiengang oder Bildungseinrichtung")).toHaveValue(/^PROGRAM:/);
+  const course = page.getByRole("group", { name: "Synthetic Short Course", exact: true });
+  await course.getByLabel("Zieltyp").selectOption("CAREER_STEP:EDUCATION");
+  await expect(reference).toHaveValue("snapshot:2:0");
   await page.getByRole("checkbox", { name: /Diesen eigenen abgeschlossenen Degree/ }).check();
-  await expect(save).toBeDisabled();
+  await save.click();
+  await expect(page.locator("#mapping-contribution-confirmed")).toBeFocused();
+  expect(submissions).toBe(0);
   await page.getByRole("checkbox", { name: /Ich habe Typen, Status/ }).check();
   await expect(save).toBeEnabled();
   let payload: unknown;
@@ -26,6 +39,7 @@ test("JSON -> reviewed schema -> PostgreSQL, confirmation gates and safe retry",
   await expect(page.getByRole("heading", { name: "In PostgreSQL gespeichert" })).toBeVisible();
   expect(saved.receipt).toMatchObject({ degrees: 1, careerSteps: 3, timelineItems: 4 });
   await expect(save).toBeDisabled();
+  expect(submissions).toBe(1);
   const retry = await request.post("/api/dev/import/mapping", { data: payload, headers: { Origin: "http://localhost:3104" } });
   expect(await retry.json()).toEqual(saved);
   await expect(page.locator("body")).not.toHaveText(/PRIVATE_SYNTHETIC_MARKER/);
@@ -35,6 +49,22 @@ test("JSON -> reviewed schema -> PostgreSQL, confirmation gates and safe retry",
   await page.reload();
   await expect(page.getByLabel("Snapshot-JSON oder rohe LinkedIn-Vorschau")).toHaveValue("");
   await expect(page.getByRole("heading", { name: "In PostgreSQL gespeichert" })).toHaveCount(0);
+});
+
+test("end-date editing updates untouched defaults and preserves an explicit Unknown choice", async ({ page }) => {
+  await page.goto("/dev/mapping");
+  await page.getByRole("button", { name: "Beispiel laden" }).click();
+  const role = page.getByRole("group", { name: "Synthetic Research Assistant", exact: true });
+  await expect(role.getByLabel("Status", { exact: true })).toHaveValue("UNKNOWN");
+  await expect(role.getByLabel("Organisation", { exact: true })).toHaveValue("CREATE");
+  await role.getByText("Quelldaten bearbeiten", { exact: true }).click();
+  await role.getByLabel("Ende", { exact: true }).fill("2025");
+  await expect(role.getByLabel("Status", { exact: true })).toHaveValue("ENDED");
+  await role.getByLabel("Status", { exact: true }).selectOption("UNKNOWN");
+  await role.getByLabel("Ende", { exact: true }).fill("2026");
+  await expect(role.getByLabel("Status", { exact: true })).toHaveValue("UNKNOWN");
+  await role.getByLabel("Anbieter / Organisation", { exact: true }).fill("");
+  await expect(role.getByLabel("Organisation", { exact: true })).toHaveValue("UNKNOWN");
 });
 
 test("replacing source invalidates every mapping and confirmation", async ({ page }) => {

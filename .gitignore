@@ -2,8 +2,12 @@ node_modules/
 .next/
 .next-import-test/
 .next-mapping-test/
+.next-workflow-test/
+.next-workflow-e2e/
 playwright-report-mapping/
 test-results-mapping/
+playwright-report-workflow/
+test-results-workflow/
 coverage/
 src/generated/
 .env*

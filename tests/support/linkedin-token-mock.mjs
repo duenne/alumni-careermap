@@ -1,17 +1,18 @@
 import fixture from "../../src/test-fixtures/linkedin-snapshots/fictional-member.json" with { type: "json" };
 
 // Loaded only by the isolated OAuth browser-test server, never by the app.
+const testOrigin = process.env.CAREERMAP_WORKFLOW_E2E === "1" ? "http://127.0.0.1:3105" : "http://127.0.0.1:3104";
 if (process.env.CAREERMAP_DEV_IMPORT_TEST !== "1"
   || process.env.LINKEDIN_CLIENT_ID !== "synthetic-client"
   || process.env.LINKEDIN_CLIENT_SECRET !== "synthetic-secret"
-  || process.env.LINKEDIN_REDIRECT_URI !== "http://127.0.0.1:3104/auth/linkedin/portability/callback") {
+  || process.env.LINKEDIN_REDIRECT_URI !== `${testOrigin}/auth/linkedin/portability/callback`) {
   throw new Error("The OAuth network mock requires the isolated synthetic configuration.");
 }
 
 const fetchLocal = globalThis.fetch;
 globalThis.fetch = async (input, options) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  if (url.origin === "http://127.0.0.1:3104" || url.origin === "http://localhost:3104") {
+  if (url.origin === testOrigin || url.origin === testOrigin.replace("127.0.0.1", "localhost")) {
     return fetchLocal(input, options);
   }
   if (url.href === "https://www.linkedin.com/oauth/v2/accessToken" && options?.method === "POST") {

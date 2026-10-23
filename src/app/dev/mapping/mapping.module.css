@@ -15,3 +15,11 @@
 .check input { flex-shrink: 0; }
 .form :focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.connection { padding: 1.25rem; margin-block: 1rem; border: 1px solid #ccdcd9; border-radius: 0.5rem; background: #f4f8f7; }
+.savedSelection { margin-top: 2rem; }
+.savedSelection label { display: block; font-weight: 600; }
+.savedSelection select { width: 100%; min-height: 48px; padding: 0.6rem; font: inherit; }
+.station details input { display: block; width: 100%; }
+.readiness { margin-block: 1rem; padding: 1rem; background: #f4f7f7; border-left: 3px solid #6d8f8c; }
+.readiness h3 { margin-top: 0; }
+.readiness li { margin-block: 0.5rem; }

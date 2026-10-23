@@ -42,11 +42,13 @@ einzurichten. Die Anwendung bindet auf dem Host zunächst nur an Loopback.
 
 ## Lokale Entwicklung und Prüfungen
 
-Der neue [vertikale JSON→Datenbank-Test](docs/testing/V1C_JSON_DATABASE_MAPPING.md)
-startet mit `npm run dev:mapping` unter `http://localhost:3104/dev/mapping`.
-Er unterstützt die lokale Phase-D-Auswahl und die LinkedIn-Rohvorschau, explizite
-Zuordnung/Referenzbestätigung und atomare Speicherung in einem separaten,
-beim Beenden entfernten PostgreSQL-17-Container.
+Der [vollständige lokale LinkedIn→Datenbank-Workflow](docs/testing/V1D_LINKEDIN_DATABASE_WORKFLOW.md)
+startet mit `npm run dev:workflow` unter `http://localhost:3100/dev/import`.
+Die Einrichtung ergänzt das private PostgreSQL-Passwort in `.env.local` und
+startet eine separate PostgreSQL-17-Testdatenbank mit persistentem Docker-Volume.
+LinkedIn-JSON laden, durch eines der 100 lokalen Beispiele ersetzen, bearbeiten,
+bestätigt speichern und als Datenbank-Timeline wieder anzeigen erfolgt auf einer Seite.
+Der [temporäre Mapping-Test](docs/testing/V1C_JSON_DATABASE_MAPPING.md) bleibt separat verfügbar.
 
 ```sh
 nvm install

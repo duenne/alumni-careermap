@@ -1,5 +1,15 @@
 # Vertikaler LinkedIn-Test – veröffentlichter Zwischenstand
 
+## Aktueller Stand vom 23.10.2026
+
+Zwischencommit `fbf3b3b` ist auf `feat/vertical-test-linkedin` committet und gepusht.
+Er enthält Rohvorschau und den temporären JSON-/Datenbank-Zwischentest.
+Der anschließende [zusammenhängende Workflow V1d](V1D_LINKEDIN_DATABASE_WORKFLOW.md)
+ist vom Nutzer abgenommen und zum Merge freigegeben: LinkedIn → JSON → synthetischer Austausch →
+Bearbeitung → persistentes PostgreSQL 17 → gespeicherte Timeline. Lokale Prüfung:
+883 Unit-, 367 Integrations- und 50 Browsertests erfolgreich. Die folgenden
+Abschnitte dokumentieren die früheren Inkremente und ihre damaligen Grenzen.
+
 ## Umfang
 
 Dieser Stand baut auf `feat/alumni-review-ui` bei `3531a4088220a036314afa5e50411514121bb5ef`

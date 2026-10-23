@@ -1,6 +1,8 @@
 node_modules
 .next
 .next-mapping-test
+.next-workflow-test
+.next-workflow-e2e
 .local-fixtures
 .git
 coverage

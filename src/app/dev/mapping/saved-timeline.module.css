@@ -1,0 +1,25 @@
+.timeline { margin-block: 3rem; padding-block: 1.5rem; border-top: 2px solid #d3e0df; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8rem; font-weight: 700; color: #316564; }
+.list { list-style: none; margin: 2rem 0; padding: 0; }
+.list li { position: relative; display: grid; grid-template-columns: 11rem minmax(0,1fr); gap: 1.5rem; padding-bottom: 1.5rem; }
+.list li::before { position: absolute; content: ""; left: 11.65rem; top: 0.6rem; bottom: -0.6rem; border-left: 2px solid #c9dcda; }
+.list li:last-child::before { bottom: 1.5rem; }
+.list li::after { position: absolute; content: ""; left: 11.35rem; top: 1rem; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: #477c7c; box-shadow: 0 0 0 4px #eaf2f1; }
+.period { padding-top: 0.75rem; color: #43535b; font-size: 0.9rem; font-weight: 600; }
+.period span { display: block; margin-top: 0.4rem; color: #68747b; font-size: 0.8rem; font-weight: 400; }
+.card { min-width: 0; padding: 1.25rem; border: 1px solid #d6e1e1; border-radius: 0.6rem; background: #fff; overflow-wrap: anywhere; }
+.card h3 { margin: 0.75rem 0 0.4rem; font-size: 1.15rem; }
+.card p { margin-block: 0.35rem; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; }
+.tags span, .tags strong { padding: 0.25rem 0.55rem; border-radius: 0.3rem; background: #edf2f4; color: #354c58; }
+.reference .card { border-color: #72a397; background: #f3faf7; }
+.tags strong { color: #1f6047; background: #dcefe4; }
+.status, .note { font-size: 0.875rem; color: #5b6870; }
+@media (max-width: 40rem) {
+  .list li { grid-template-columns: minmax(0,1fr); gap: 0.5rem; padding-left: 1.25rem; }
+  .list li::before { left: 0.2rem; }
+  .list li::after { left: -0.1rem; }
+  .period { padding-top: 0.3rem; }
+  .period span { display: inline; margin-left: 0.75rem; }
+  .card { padding: 1rem; }
+}

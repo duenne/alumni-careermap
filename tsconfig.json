@@ -37,7 +37,11 @@
     ".next-import-test/types/**/*.ts",
     ".next-import-test/dev/types/**/*.ts",
     ".next-mapping-test/types/**/*.ts",
-    ".next-mapping-test/dev/types/**/*.ts"
+    ".next-mapping-test/dev/types/**/*.ts",
+    ".next-workflow-test/types/**/*.ts",
+    ".next-workflow-test/dev/types/**/*.ts",
+    ".next-workflow-e2e/types/**/*.ts",
+    ".next-workflow-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

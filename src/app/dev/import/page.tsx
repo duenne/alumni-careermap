@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ImportEditor from "./import-editor";
+import MappingEditor from "../mapping/mapping-editor";
 
 export const metadata: Metadata = {
   title: "LinkedIn-Testimport – Entwicklung",
@@ -12,5 +13,5 @@ export const metadata: Metadata = {
 // The narrowly matched server-side proxy enforces the development gate before
 // React renders this page. No asynchronous/notFound Flight error path is needed.
 export default function ImportPage() {
-  return <ImportEditor />;
+  return process.env.CAREERMAP_DEV_WORKFLOW === "1" ? <MappingEditor workflow /> : <ImportEditor />;
 }

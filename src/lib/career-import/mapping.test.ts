@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mapCareerImport, readCareerSnapshot, suggestReviews, type ImportReview } from "./mapping";
+import { phaseDExample } from "./phase-d";
 
 export const syntheticSnapshot = () => ({ elements: [
   { snapshotDomain: "EDUCATION", snapshotData: [
@@ -56,10 +57,30 @@ describe("JSON to reviewed database mapping", () => {
     const extra = syntheticReviews(); Object.assign(extra[0], { alumniId: "forged" });
     expect(() => mapCareerImport(snapshot, extra)).toThrow();
   });
-  it("suggestions never assert completion, ongoing work or a reference; unknown dates remain unknown", () => {
+  it("prefills editable completed/ended proposals and new catalog entries, leaving unknown ends and references open", () => {
     const result = suggestReviews(readCareerSnapshot(syntheticSnapshot()));
-    expect(result.find(r => r.classification === "DEGREE:BACHELOR")?.status).toBe("UNKNOWN");
+    expect(result.find(r => r.classification === "DEGREE:BACHELOR")?.status).toBe("COMPLETED");
+    expect(result.find(r => r.classification === "CAREER_STEP:VOCATIONAL_TRAINING")?.status).toBe("ENDED");
     expect(result.find(r => r.sourceKey === "snapshot:1:0")?.status).toBe("UNKNOWN");
-    expect(result.every(r => r.catalog === "UNKNOWN")).toBe(true);
+    expect(result.every(r => r.catalog === "CREATE")).toBe(true);
+    expect(Object.keys(result[0]).sort()).toEqual(["catalog", "classification", "position", "sourceKey", "status"]);
+  });
+  it("keeps absent provider names and unknown end-date text open", () => {
+    const value = syntheticSnapshot();
+    Object.assign(value.elements[1].snapshotData[0], { "Company Name": "", "Finished On": "unknown" });
+    expect(suggestReviews(readCareerSnapshot(value)).find(r => r.sourceKey === "snapshot:1:0")).toMatchObject({ status: "UNKNOWN", catalog: "UNKNOWN" });
+  });
+  it("applies the same status and provider proposals after Phase-D classification hints", () => {
+    const value = { elements: [
+      { snapshotDomain: "EDUCATION", snapshotData: [{ "Degree Name": "Synthetic study", "School Name": "Synthetic school", "Start Date": "2017", "End Date": "2021" }] },
+      { snapshotDomain: "POSITIONS", snapshotData: [{ Title: "Synthetic role", "Company Name": "Synthetic company", "Started On": "2021", "Finished On": "2023" }] },
+    ] };
+    const example = phaseDExample(value, { syntheticId: "synthetic-1", msiAnchor: { stationId: "study" }, stations: [
+      { stationId: "study", stationType: "EDUCATION", titleRaw: "Synthetic study", organisationRaw: "Synthetic school", degreeLevel: "MASTER", chronologyIndex: 1, isCurrent: false },
+      { stationId: "job", stationType: "POSITION", titleRaw: "Synthetic role", organisationRaw: "Synthetic company", employmentForm: "EMPLOYED", chronologyIndex: 2, isCurrent: false },
+    ] });
+    expect(example.reviews.map(r => [r.classification, r.status, r.catalog])).toEqual([
+      ["CAREER_STEP:EMPLOYMENT", "ENDED", "CREATE"], ["DEGREE:MASTER", "COMPLETED", "CREATE"],
+    ]);
   });
 });
