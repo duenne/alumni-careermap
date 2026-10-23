@@ -22,3 +22,7 @@ test-results/
 test-results-v1a/
 test-results-oauth/
 artifacts/
+.next-analytics/
+.next-analytics-e2e/
+test-results-analytics/
+playwright-report-analytics/

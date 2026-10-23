@@ -7,6 +7,9 @@
     "node": ">=22.23.3 <23"
   },
   "scripts": {
+    "analytics": "node --import tsx scripts/analytics.ts",
+    "test:e2e:analytics": "playwright test --config playwright.analytics.config.ts",
+    "test:e2e:analytics:local": "playwright test --config playwright.analytics-local.config.ts",
     "dev": "next dev",
     "dev:import": "CAREERMAP_DEV_IMPORT=1 next dev --hostname localhost --port 3100",
     "dev:mapping": "node scripts/dev-mapping.mjs",
@@ -20,7 +23,7 @@
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "npm run build && playwright test && npm run test:e2e:import && npm run test:e2e:oauth && npm run test:e2e:mapping && npm run test:e2e:workflow",
+    "test:e2e": "npm run build && playwright test && npm run test:e2e:import && npm run test:e2e:oauth && npm run test:e2e:mapping && npm run test:e2e:workflow && npm run test:e2e:analytics",
     "test:e2e:import": "playwright test --config playwright.import.config.ts",
     "test:e2e:oauth": "playwright test --config playwright.oauth.config.ts",
     "test:integration": "node scripts/test-integration.mjs",
@@ -32,6 +35,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "d3-sankey": "0.12.3",
     "next": "^16.0.0",
     "pg": "^8.0.0",
     "react": "^19.0.0",
@@ -45,6 +49,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "@types/d3-sankey": "0.12.5",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.0.0",
     "@types/react": "^19.0.0",
@@ -54,6 +59,7 @@
     "eslint-config-next": "^16.0.0",
     "jsdom": "26.1.0",
     "prisma": "7.10.0",
+    "tsx": "4.20.6",
     "typescript": "~5.9.0",
     "vitest": "^4.0.0"
   }

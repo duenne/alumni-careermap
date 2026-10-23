@@ -14,6 +14,9 @@ test("V1a: Entwicklungsimport bleibt im Produktionsserver gesperrt", async ({ re
   }
   expect((await request.post("/api/dev/import/linkedin/raw-snapshot")).status()).toBe(404);
   expect((await request.get("/dev/mapping")).status()).toBe(404);
+  const analytics = await request.get("/dev/analytics");
+  expect(analytics.status()).toBe(404);
+  expect(await analytics.text()).not.toContain("Karrierepfade erkunden");
   expect((await request.get("/api/dev/import/mapping")).status()).toBe(404);
   expect((await request.post("/api/dev/import/mapping", { data: {} })).status()).toBe(404);
 });

@@ -1,0 +1,20 @@
+name: careermap-analytics
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: careermap_analytics_demo
+      POSTGRES_USER: careermap_analytics
+      POSTGRES_PASSWORD: ${CAREERMAP_ANALYTICS_PASSWORD:?Use npm run analytics -- setup}
+    ports:
+      - "127.0.0.1:${CAREERMAP_ANALYTICS_DB_PORT:-5434}:5432"
+    volumes:
+      - analytics_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careermap_analytics -d careermap_analytics_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+volumes:
+  analytics_data:

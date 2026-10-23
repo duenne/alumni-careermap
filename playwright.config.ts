@@ -33,6 +33,7 @@ export default defineConfig({
       PORT: "3102",
       // Even an accidentally enabled flag must not expose the development import.
       CAREERMAP_DEV_IMPORT: "1",
+      CAREERMAP_DEV_ANALYTICS: "1",
       // No database is needed by this demo. Override any inherited real URL.
       DATABASE_URL: "postgresql://v0:v0@127.0.0.1:1/v0_no_database?connect_timeout=1",
     },
