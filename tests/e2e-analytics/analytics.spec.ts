@@ -11,13 +11,16 @@ test("20 profiles from PostgreSQL -> complete timeline -> interactive conserved 
   await expect(timeline.getByRole("heading", { name: "Synthetic role" })).toBeVisible();
   await expect(timeline.getByText("Synthetischer Demoanker", { exact: false })).toBeVisible();
   const chart = page.getByRole("region", { name: "MSI-Sankey", exact: true });
+  await expect(chart.locator("[data-stage-heading]")).toHaveCount(4);
+  await expect(chart).toContainText("60 Übergangsbeiträge");
+  await page.getByRole("button", { name: "Gesamte Karrierehistorie", exact: true }).click();
   await expect(chart).toContainText("20 Profile im Diagramm"); await expect(chart).toContainText("120 Übergangsbeiträge");
   await expect(chart.locator("svg path")).toHaveCount(6);
   await expect(page.locator("#analytics-path")).not.toHaveValue("");
   await page.getByRole("button", { name: "Auswahl aufheben" }).click();
   const link = chart.locator("svg path").first(); await link.focus();
   await expect(chart.getByRole("status")).toContainText("20 Personen");
-  await link.press("Enter"); await link.blur(); await expect(chart.getByRole("status")).toContainText("20 Profile im ausgewählten Fluss");
+  await link.press("Enter"); await link.blur(); await expect(chart.getByRole("status")).toContainText("20 Profile im ausgewählten Fluss fixiert");
   await expect(page.getByRole("list", { name: "Farblegende" })).toBeVisible();
   await page.reload(); await expect(rows).toHaveCount(20);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -11,7 +11,7 @@ export default function Dashboard({ profiles }: { profiles: AnalyticsProfile[] }
   const profile = profiles.find(p => p.id === selected);
   const stations = profiles.flatMap(p => p.stations);
   const flow = aggregateCareers(profiles);
-  const counts = [["Profile", profiles.length], ["Degrees", stations.filter(s => s.kind === "DEGREE").length], ["CareerSteps", stations.filter(s => s.kind === "CAREER_STEP").length], ["TimelineItems", stations.length], ["Synthetische Demoanker", profiles.filter(p => p.stations.some(s => s.demoAnchor)).length], ["Nicht vollständig auswertbar", flow.partial + flow.excluded.length]];
+  const counts = [["Profile", profiles.length], ["Degrees", stations.filter(s => s.kind === "DEGREE").length], ["CareerSteps", stations.filter(s => s.kind === "CAREER_STEP").length], ["TimelineItems", stations.length], ["Synthetische Demoanker", profiles.filter(p => p.stations.some(s => s.demoAnchor)).length], ["Gesamthistorien mit Unklarheiten", flow.partial + flow.excluded.length]];
   return <main id="main-content" className={styles.main}>
     <p className="eyebrow">ENTWICKLUNG · AUSSCHLIESSLICH SYNTHETISCH</p>
     <h1>MSI · Karrierepfade erkunden</h1>

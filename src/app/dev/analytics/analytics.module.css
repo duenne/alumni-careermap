@@ -25,3 +25,14 @@
 .controls { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
 .chartNote { min-height: 3rem; padding: .6rem 1rem; background: #f0edf6; }
 .main summary { cursor: pointer; }
+.viewSwitch { display: flex; flex-wrap: wrap; gap: .5rem; }
+.viewSwitch button[aria-pressed=true] { background: #e9dff6; border-color: #8063a4; font-weight: 700; }
+.chartMeasure { width: 100%; min-width: 0; }
+.controls label { display: flex; flex-direction: column; gap: .3rem; min-width: 0; max-width: 100%; font-size: .9rem; }
+.controls select { max-width: min(100%, 31rem); text-overflow: ellipsis; }
+.chartWrap svg { height: auto; }
+.chartWrap [role=button] { cursor: pointer; }
+.chartWrap [role=button]:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.help { color: #555; font-size: .85rem; }
+.flowSummary { font-weight: 700; }
+@media (max-width: 40rem) { .controls { align-items: stretch; } .controls label { width: 100%; } }

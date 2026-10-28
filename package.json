@@ -8,6 +8,7 @@
   },
   "scripts": {
     "analytics": "node --import tsx scripts/analytics.ts",
+    "analytics:compare": "node --import tsx scripts/analytics-comparison.ts",
     "test:e2e:analytics": "playwright test --config playwright.analytics.config.ts",
     "test:e2e:analytics:local": "playwright test --config playwright.analytics-local.config.ts",
     "dev": "next dev",
