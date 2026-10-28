@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NEXT_TELEMETRY_DISABLED: "1"
@@ -26,13 +26,31 @@ jobs:
       - run: npm run test:integration
       - run: npm run typecheck
       - run: npm run build
+
+  # Browser provisioning has its own budget; it must not consume the time for
+  # lint, unit/integration tests and the production build in the checks job.
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
-      # The production build above is shared with the browser tests.
+      # Only the review/production-guard suite needs this production build.
+      # All suites run sequentially because they share development server ports.
+      - run: npm run build
       - run: npx playwright test
       - run: npm run test:e2e:import
       - run: npm run test:e2e:oauth
       - run: npm run test:e2e:mapping
       - run: npm run test:e2e:workflow
+      - run: npm run test:e2e:analytics
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -48,4 +66,6 @@ jobs:
             test-results-mapping/
             playwright-report-workflow/
             test-results-workflow/
+            playwright-report-analytics/
+            test-results-analytics/
           retention-days: 14
