@@ -1,4 +1,4 @@
-import { aggregateCareers, type CareerFlow, type FlowNode } from "./aggregate";
+import { referenceStations, referenceLabel, aggregateCareers, type CareerFlow, type FlowNode } from "./aggregate";
 import type { AnalyticsProfile, AnalyticsStation } from "./records";
 
 export const overviewStages = ["BA MSI · Referenzabschluss", "Masterstudium · Fachrichtung", "Erste Tätigkeit nach MSI · Branche", "Erste Tätigkeit nach MSI · Jobkategorie"];
@@ -67,9 +67,9 @@ export function aggregateOverview(profiles: AnalyticsProfile[]): OverviewFlow {
     const diagnostic = diagnostics.get(p.id);
     if (!diagnostic || seen.has(p.id)) continue;
     seen.add(p.id);
-    const anchor = p.stations.find(s => s.demoAnchor)!;
+    const anchor = referenceStations(p)[0];
     const work = firstOccupation(p, anchor), master = masterStudies(p, anchor);
-    const groups = [known("BA MSI · synthetischer Demoanker"), master.group, ...work.groups];
+    const groups = [known(referenceLabel(p)), master.group, ...work.groups];
     const nodeIds = groups.map((group, stage) => {
       const id = JSON.stringify([stage, group.label]); nodes.set(id, { id, stage, ...group }); return id;
     });

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 vi.mock("server-only", () => ({}));
 import { createLinkedInHandlers } from "./routes";
 import { EphemeralLinkedInSessions } from "./sessions";
-import { PortabilityError, type CareerDataProvider } from "./provider";
+import { createLinkedInProvider, PortabilityError, type CareerDataProvider } from "./provider";
 import type { LinkedInConfig } from "./config";
 import { proxy } from "../../../proxy";
 import fixture from "../../../test-fixtures/linkedin-snapshots/fictional-member.json";
@@ -51,6 +51,23 @@ async function connect(app: ReturnType<typeof setup>) {
 }
 
 describe("V1b OAuth routes and temporary server sessions", () => {
+  it("keeps the registered callback fixed and returns to the survey only after validating OAuth state", async () => {
+    const app = setup();
+    app.provider.authorizationUrl = createLinkedInProvider(config).authorizationUrl;
+    const surveyPath = "/surveys/00000000-0000-4000-8000-000000000001/participate";
+    const handlers = createLinkedInHandlers({ config: () => config, provider: () => app.provider, store: app.store }, {
+      returnPath: () => surveyPath, cookieName: "careermap_linkedin_survey",
+    });
+    const start = await handlers.POST(request("start", "POST"));
+    expect(start.status).toBe(303);
+    const authorize = new URL(start.headers.get("location")!);
+    expect(authorize.searchParams.get("redirect_uri")).toBe(`${origin}/auth/linkedin/portability/callback`);
+    expect(authorize.searchParams.get("redirect_uri")).not.toContain("/surveys/");
+    const callback = await handlers.GET(request("callback", "GET", cookieOf(start), `?state=${authorize.searchParams.get("state")}&code=synthetic-code`));
+    expect(callback.status).toBe(303);
+    expect(callback.headers.get("location")).toBe(`${origin}${surveyPath}?linkedin=connected`);
+    expect(app.provider.exchange).toHaveBeenCalledOnce();
+  });
   it("serves an authenticated raw preview without normalizing and denies unauthenticated, CSRF and production access", async () => {
     const app = setup();
     expect((await app.POST(request("raw-snapshot", "POST"))).status).toBe(401);

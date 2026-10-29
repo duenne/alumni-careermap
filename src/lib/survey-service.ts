@@ -51,9 +51,16 @@ export async function withOpenSurvey<T>(
 /** All existing status values and transitions are allowed; the reference
  * Program remains unchanged. Serialize with confirmed-response work on Survey.
  */
-export async function updateSurveyStatus(client: PrismaClient, surveyId: string, status: SurveyStatus): Promise<Survey> {
+export async function updateSurveyStatus(
+  client: PrismaClient,
+  surveyId: string,
+  status: SurveyStatus,
+  authorize?: (tx: Prisma.TransactionClient, survey: LockedSurvey) => Promise<void>,
+): Promise<Survey> {
   return client.$transaction(async tx => {
-    await lockSurvey(tx, surveyId);
+    const survey = await lockSurvey(tx, surveyId);
+    // Operator-facing callers validate affiliation under the same row lock.
+    await authorize?.(tx, survey);
     return tx.survey.update({
       where: { id: surveyId },
       data: { status, updatedAt: new Date() },

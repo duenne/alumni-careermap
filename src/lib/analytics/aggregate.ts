@@ -29,14 +29,18 @@ function category(stations: AnalyticsStation[], key: "field" | "sector" | "job",
  * dates, order conflicts and overlaps remain unclear. Definitely during-study
  * stations stay in the canonical timeline but not these before/after stages.
  */
+export function referenceStations(p: AnalyticsProfile) {
+  return p.referenceDegreeId !== undefined ? p.stations.filter(s => s.id === p.referenceDegreeId) : p.stations.filter(s => s.demoAnchor);
+}
+export const referenceLabel = (p: AnalyticsProfile) => p.referenceDegreeId !== undefined ? "Bestätigter MSI-Bachelor" : "BA MSI · synthetischer Demoanker";
 export function aggregateCareers(profiles: AnalyticsProfile[]): CareerFlow {
   const result: CareerFlow = { nodes: [], links: [], paths: [], included: 0, partial: 0, excluded: [] };
   const nodes = new Map<string, FlowNode>(), links = new Map<string, FlowLink>();
   const seen = new Set<string>();
   for (const p of profiles) {
-    const exclude = (reason: string) => result.excluded.push({ alumniId: p.id, reason });
+    const exclude = (reason: string) => result.excluded.push({ alumniId: p.id, reason: p.referenceDegreeId !== undefined ? reason.replace("DEMO_ANCHOR","CONFIRMED_REFERENCE") : reason });
     if (seen.has(p.id)) { exclude("DUPLICATE_PROFILE"); continue; } seen.add(p.id);
-    const anchors = p.stations.filter(s => s.demoAnchor);
+    const anchors = referenceStations(p);
     if (anchors.length !== 1) { exclude(anchors.length ? "AMBIGUOUS_DEMO_ANCHOR" : "MISSING_DEMO_ANCHOR"); continue; }
     const anchor = anchors[0];
     if (anchor.kind !== "DEGREE" || anchor.type !== "BACHELOR" || anchor.status !== "COMPLETED") { exclude("INELIGIBLE_DEMO_ANCHOR"); continue; }
@@ -49,7 +53,7 @@ export function aggregateCareers(profiles: AnalyticsProfile[]): CareerFlow {
       category(selected("education", "BEFORE"), "field", selected("education", "UNCLEAR").length > 0, p.completeTestCase),
       category(selected("work", "BEFORE"), "sector", selected("work", "UNCLEAR").length > 0, p.completeTestCase),
       category(selected("work", "BEFORE"), "job", selected("work", "UNCLEAR").length > 0, p.completeTestCase),
-      { label: "BA MSI · synthetischer Demoanker", state: "known" as const },
+      { label: referenceLabel(p), state: "known" as const },
       category(selected("master", "AFTER"), "field", selected("master", "UNCLEAR").length > 0, p.completeTestCase, true),
       category(selected("work", "AFTER"), "sector", selected("work", "UNCLEAR").length > 0, p.completeTestCase),
       category(selected("work", "AFTER"), "job", selected("work", "UNCLEAR").length > 0, p.completeTestCase),

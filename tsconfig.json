@@ -45,7 +45,13 @@
     ".next-analytics/types/**/*.ts",
     ".next-analytics/dev/types/**/*.ts",
     ".next-analytics-e2e/types/**/*.ts",
-    ".next-analytics-e2e/dev/types/**/*.ts"
+    ".next-analytics-e2e/dev/types/**/*.ts",
+    ".next-surveys-test/types/**/*.ts",
+    ".next-surveys-test/dev/types/**/*.ts",
+    ".next-integrated-e2e/types/**/*.ts",
+    ".next-integrated-e2e/dev/types/**/*.ts",
+    ".next-surveys-e2e/types/**/*.ts",
+    ".next-surveys-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

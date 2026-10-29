@@ -5,7 +5,7 @@ export type AnalyticsStation = {
   startYear: number | null; endYear: number | null; graduationYear: number | null;
   provider: string | null; field: string | null; sector: string | null; job: string | null; location: string | null; demoAnchor: boolean;
 };
-export type AnalyticsProfile = { id: string; completeTestCase: boolean; stations: AnalyticsStation[] };
+export type AnalyticsProfile = { id: string; referenceDegreeId?: string; completeTestCase: boolean; stations: AnalyticsStation[] };
 export type Database = Prisma.TransactionClient | PrismaClient;
 export async function checkAnalyticsDatabase(client: Database, url: string) {
   validateAnalyticsDatabaseUrl(url);

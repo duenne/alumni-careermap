@@ -3,8 +3,11 @@ import snapshot from "../test-fixtures/linkedin-snapshots/fictional-member.json"
 import { adaptLinkedInSnapshot } from "../lib/normalization/adapt-linkedin-snapshot";
 import type { NormalizationInput } from "../lib/normalization/contract";
 import { ObservedStations } from "./observed-stations";
+import { integratedJourneyEnabled } from "../lib/donation/entry-config";
+import JourneyHome from "./journey-home";
 
 export default function Home() {
+  if (integratedJourneyEnabled()) return <JourneyHome />;
   let input: NormalizationInput | undefined;
   try {
     input = adaptLinkedInSnapshot(snapshot);

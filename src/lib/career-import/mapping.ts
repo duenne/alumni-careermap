@@ -6,10 +6,11 @@ import type { StationOutcome } from "../normalization/contract";
 import type { SnapshotProjection } from "../dev-import/json-preview";
 import { isNoSnapshotData } from "../dev-import/linkedin/no-data";
 
-export type ImportReview = { sourceKey: string; classification: string; status: string; position: number; catalog: string };
+export type ImportReview = { sourceKey: string; classification: string; status: string; position: number; catalog: string; details?: { field: string; job: string; sector: string } };
 type ResolvedCareer = Extract<StationOutcome, { kind: "RESOLVED_CAREER_STEP" }>;
-export type MappedStation = Extract<StationOutcome, { kind: "RESOLVED_DEGREE" }>
-  | (Omit<ResolvedCareer, "canonical"> & { canonical: Omit<ResolvedCareer["canonical"], "location"> & { location: string | null } });
+type ResolvedDegree = Extract<StationOutcome, { kind: "RESOLVED_DEGREE" }>;
+export type MappedStation = (Omit<ResolvedDegree,"canonical"> & {canonical:Omit<ResolvedDegree["canonical"],"fieldOfStudy"> & {fieldOfStudy:string|null}})
+  | (Omit<ResolvedCareer, "canonical"> & { canonical: Omit<ResolvedCareer["canonical"], "location" | "roleCategory" | "functionArea"> & { location: string | null; roleCategory: string|null; functionArea:string|null } });
 export class CareerImportError extends Error {
   constructor(readonly code: "INVALID_SOURCE" | "INCOMPLETE_SOURCE" | "INVALID_REVIEW" | "UNRESOLVED_STATION" | "CONFIRMATION_REQUIRED" | "INVALID_REFERENCE" | "INVALID_CATALOG" = "INVALID_SOURCE") {
     super(code); this.name = "CareerImportError";
@@ -116,7 +117,7 @@ export function mapCareerImport(snapshot: SnapshotProjection, reviews: unknown):
   if (!Array.isArray(reviews) || reviews.length !== input.stations.length || reviews.length === 0) return fail("INVALID_REVIEW");
   const seen = new Set<string>();
   const updates = reviews.map(review => {
-    if (!record(review) || Object.keys(review).length !== 5 || !["sourceKey", "classification", "status", "position", "catalog"].every(key => Object.hasOwn(review, key))
+    if (!record(review) || Object.keys(review).length !== (review.details === undefined ? 5 : 6) || !["sourceKey", "classification", "status", "position", "catalog"].every(key => Object.hasOwn(review, key))
       || typeof review.sourceKey !== "string" || seen.has(review.sourceKey)) return fail("INVALID_REVIEW");
     seen.add(review.sourceKey);
     const choice = classificationChoices.find(c => c.value === review.classification);
@@ -125,6 +126,7 @@ export function mapCareerImport(snapshot: SnapshotProjection, reviews: unknown):
     if (!(degree ? degreeStatuses : careerStatuses).some(status => status.value === review.status)) return fail("INVALID_REVIEW");
     const catalog = review.catalog;
     if (typeof catalog !== "string") return fail("INVALID_CATALOG");
+    if (review.details !== undefined && (!record(review.details) || Object.keys(review.details).sort().join() !== "field,job,sector" || Object.values(review.details).some(v => typeof v !== "string" || v.length > 200))) return fail("INVALID_REVIEW");
     const [entity, id, extra] = catalog.split(":");
     if (!["UNKNOWN", "CREATE"].includes(catalog) && (!uuid(id) || extra !== undefined || !(degree ? ["PROGRAM", "INSTITUTION"] : ["ORGANISATION"]).includes(entity))) return fail("INVALID_CATALOG");
     const catalogSelection = uuid(id) ? { identity: { entity, id: id.toLowerCase() }, confirmation: "EXPLICIT_SELECTION" } : undefined;
@@ -140,8 +142,10 @@ export function mapCareerImport(snapshot: SnapshotProjection, reviews: unknown):
     // or intermediate branch/role/category hints. The preview is the write plan.
     return { stations: result.stations.map(station => {
       if (station.kind === "REVIEW_REQUIRED") return fail("UNRESOLVED_STATION");
-      return station.kind === "RESOLVED_DEGREE" ? station : { ...station, canonical: {
-        ...station.canonical, location: rows.find(row => row.sourceKey === station.sourceKey)?.location || null,
+      const review = (reviews as ImportReview[]).find(r => r.sourceKey === station.sourceKey)!;
+      const details = review.details;
+      return station.kind === "RESOLVED_DEGREE" ? { ...station, canonical: { ...station.canonical, ...(details ? { fieldOfStudy: cleanText(details.field) || null } : {}) } } : { ...station, canonical: {
+        ...station.canonical, ...(details ? { roleCategory: cleanText(details.job) || null, functionArea: cleanText(details.field) || null } : {}), location: rows.find(row => row.sourceKey === station.sourceKey)?.location || null,
       } };
     }) };
   } catch (error) { if (error instanceof CareerImportError) throw error; return fail("INVALID_REVIEW"); }
