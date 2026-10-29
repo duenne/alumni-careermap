@@ -1,7 +1,9 @@
 import fixture from "../../src/test-fixtures/linkedin-snapshots/fictional-member.json" with { type: "json" };
 
 // Loaded only by the isolated OAuth browser-test server, never by the app.
-const testOrigin = process.env.CAREERMAP_WORKFLOW_E2E === "1" ? "http://127.0.0.1:3105" : "http://127.0.0.1:3104";
+const donationPort = process.env.CAREERMAP_INTEGRATED_E2E_PORT || "3112";
+if (!/^[0-9]+$/.test(donationPort) || Number(donationPort)<1024 || Number(donationPort)>65535) throw new Error("Invalid isolated OAuth test port");
+const testOrigin = process.env.CAREERMAP_DONATION_E2E === "1" ? `http://127.0.0.1:${donationPort}` : process.env.CAREERMAP_WORKFLOW_E2E === "1" ? "http://127.0.0.1:3105" : "http://127.0.0.1:3104";
 if (process.env.CAREERMAP_DEV_IMPORT_TEST !== "1"
   || process.env.LINKEDIN_CLIENT_ID !== "synthetic-client"
   || process.env.LINKEDIN_CLIENT_SECRET !== "synthetic-secret"

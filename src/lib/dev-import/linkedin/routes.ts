@@ -13,15 +13,17 @@ const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
 const unavailable = () => new NextResponse("Nicht verfügbar.", { status: 404, headers });
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers });
 const error = (code: PortabilityErrorCode, status = 400, diagnostic?: unknown) => json({ code, message: portabilityMessages[code], diagnostic: safeSnapshotDiagnostic(diagnostic) }, status);
-function setCookie(response: NextResponse, request: NextRequest, value = "") {
-  response.cookies.set(cookieName, value, { httpOnly: true, sameSite: "lax", secure: new URL(request.url).protocol === "https:",
+function cookieResponse(response: NextResponse, request: NextRequest, value = "", name = cookieName) {
+  response.cookies.set(name, value, { httpOnly: true, sameSite: "lax", secure: new URL(request.url).protocol === "https:",
     path: "/", maxAge: value ? SESSION_SECONDS : 0 });
   return response;
 }
+type RouteOptions = { apiPath?: string; cookieName?: string; allowed?: (request: NextRequest, callback: boolean) => boolean; returnPath?: (request: NextRequest) => string };
 type Dependencies = { config: () => LinkedInConfig | null; provider: (config: LinkedInConfig) => CareerDataProvider; store: EphemeralLinkedInSessions };
 
-export function createLinkedInHandlers({ config: readConfig, provider, store }: Dependencies) {
-  const cookie = (request: NextRequest) => request.cookies.get(cookieName)?.value;
+export function createLinkedInHandlers({ config: readConfig, provider, store }: Dependencies, options: RouteOptions = {}) {
+  const setCookie = (response: NextResponse, request: NextRequest, value = "") => cookieResponse(response, request, value, options.cookieName ?? cookieName);
+  const cookie = (request: NextRequest) => request.cookies.get(options.cookieName ?? cookieName)?.value;
   // NextURL normalizes 127.0.0.1 to localhost. Keep the gated Host spelling so
   // the OAuth redirect and the browser's Origin remain exactly identical.
   const requestOrigin = (request: NextRequest) => `${new URL(request.url).protocol}//${request.headers.get("host")}`;
@@ -30,16 +32,16 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
   }
   const action = (request: NextRequest) => {
     const path = new URL(request.url).pathname;
-    return path === CALLBACK_PATH ? "callback" : path.startsWith(`${apiPath}/`) ? path.slice(apiPath.length + 1) : "";
+    return path === CALLBACK_PATH ? "callback" : path.startsWith(`${options.apiPath ?? apiPath}/`) ? path.slice((options.apiPath ?? apiPath).length + 1) : "";
   };
   const redirect = (request: NextRequest, result: string) => new NextResponse(null, {
-    status: 303, headers: { ...headers, Location: `${requestOrigin(request)}/dev/import?linkedin=${result}` },
+    status: 303, headers: { ...headers, Location: `${requestOrigin(request)}${options.returnPath?.(request) ?? "/dev/import"}?linkedin=${result}` },
   });
   return {
     async GET(request: NextRequest): Promise<NextResponse> {
       const name = action(request);
       if (name === "callback") {
-        if (!allowLinkedInCallback(request)) return unavailable();
+        if (!(options.allowed ? options.allowed(request, true) : allowLinkedInCallback(request))) return unavailable();
         const config = configFor(request);
         if (!config) return setCookie(redirect(request, "NOT_CONFIGURED"), request);
         const params = new URL(request.url).searchParams;
@@ -65,7 +67,7 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
           return setCookie(redirect(request, failure instanceof PortabilityError ? failure.code : "TOKEN_EXCHANGE_FAILED"), request);
         }
       }
-      if (!allowDevImport(request.headers)) return unavailable();
+      if (!(options.allowed ? options.allowed(request, false) : allowDevImport(request.headers))) return unavailable();
       if (name !== "status") return unavailable();
       const localConfig = readConfig();
       const config = configFor(request, localConfig);
@@ -77,7 +79,7 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
     async POST(request: NextRequest): Promise<NextResponse> {
       // All state-changing entry points require same-origin POST, independently
       // of the proxy. A callback navigation is the only intentional exception.
-      if (!allowDevImport(request.headers) || request.headers.get("origin") !== requestOrigin(request)) return unavailable();
+      if (!(options.allowed ? options.allowed(request, false) : allowDevImport(request.headers)) || request.headers.get("origin") !== requestOrigin(request)) return unavailable();
       const name = action(request);
       if (name === "disconnect") {
         store.remove(cookie(request));

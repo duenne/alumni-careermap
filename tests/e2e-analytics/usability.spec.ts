@@ -1,0 +1,42 @@
+import { test, expect } from "@playwright/test";
+test("four responsive stages, filters, full-path highlighting and short keyboard sequence", async ({ page }, info) => {
+  let analyticsRequests = 0;
+  page.on("request", request => { if (new URL(request.url()).pathname === "/dev/analytics") analyticsRequests++; });
+  await page.goto("/dev/analytics");
+  const initialRequests = analyticsRequests;
+  const chart = page.getByRole("region", { name: "MSI-Sankey", exact: true });
+  await expect(chart.getByRole("button", { name: "Typische Karrierepfade", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(chart.locator("[data-stage-heading]")).toHaveCount(4);
+  await expect(chart.locator("svg path")).toHaveCount(3);
+  const scroll = chart.getByLabel("Vier Sankey-Stufen; auf schmalen Bildschirmen scrollbar");
+  if (info.project.name !== "narrow") {
+    await expect.poll(() => scroll.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await scroll.scrollIntoViewIfNeeded();
+    await expect(chart.locator('[data-stage-heading="3"]')).toBeInViewport();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByLabel("Masterstudium", { exact: true }).selectOption("with");
+  await expect(chart).toContainText("0 Profile im Diagramm");
+  await expect(chart.locator("svg")).toHaveCount(0);
+  await page.getByLabel("Masterstudium", { exact: true }).selectOption("without");
+  await expect(chart).toContainText("20 Profile im Diagramm");
+  await page.getByLabel("Analyse-Schwerpunkt", { exact: true }).selectOption("sectors");
+  await expect(chart.locator('[data-focus-stage="true"]')).toHaveCount(1);
+  await expect(chart.locator('[data-focus-stage="true"]')).toHaveAttribute("data-stage-heading", "2");
+  await page.getByRole("button", { name: "Alle Filter zurücksetzen" }).click();
+  const node = chart.locator('svg [role="button"][tabindex="0"]');
+  await expect(node).toHaveCount(1); await node.focus(); await node.press("ArrowRight");
+  await expect(chart.getByRole("status")).toContainText("100,0 %");
+  await page.keyboard.press("Enter"); await page.keyboard.press("Tab");
+  await expect(chart.getByRole("status")).toContainText("fixiert");
+  const linkSelect = page.getByLabel("Verbindung hervorheben", { exact: true });
+  await linkSelect.selectOption({ index: 1 });
+  await expect(chart.locator('path[data-highlighted="true"]')).toHaveCount(3);
+  await expect(chart.getByRole("status")).toContainText("100,0 %");
+  await page.getByRole("button", { name: "Auswahl aufheben" }).click();
+  await expect(chart.locator('path[data-highlighted="true"]')).toHaveCount(0);
+  await chart.getByText("Kategoriehäufigkeiten als Tabelle – vollständige Textalternative", { exact: true }).click();
+  await expect(chart.getByRole("columnheader", { name: "Anteil", exact: true })).toBeVisible();
+  await chart.screenshot({ path: `artifacts/v2.4/${info.project.name}-overview-20.png` });
+  expect(analyticsRequests).toBe(initialRequests);
+});

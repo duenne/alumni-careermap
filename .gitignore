@@ -1,5 +1,10 @@
 node_modules/
 .next/
+.next-integrated-e2e/
+.next-surveys-e2e/
+.next-surveys-test/
+playwright-report-surveys/
+test-results-surveys/
 .next-import-test/
 .next-mapping-test/
 .next-workflow-test/
@@ -22,3 +27,10 @@ test-results/
 test-results-v1a/
 test-results-oauth/
 artifacts/
+.next-analytics/
+.next-analytics-e2e/
+test-results-analytics/
+playwright-report-analytics/
+
+playwright-report-integrated/
+test-results-integrated/

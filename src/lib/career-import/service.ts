@@ -38,7 +38,7 @@ export async function saveCareerImport(client: PrismaClient, input: unknown, con
         if (station.kind === "RESOLVED_DEGREE" && "institutionId" in data) {
           data.institutionId = (await tx.institution.create({ data: { name: source.provider } })).id;
         } else if ("organisationId" in data) {
-          data.organisationId = (await tx.organisation.create({ data: { name: source.provider } })).id;
+          data.organisationId = (await tx.organisation.create({ data: { name: source.provider, ...(review.details?.sector.trim() ? { sector: review.details.sector.normalize("NFC").trim() } : {}) } })).id;
         }
       } else if (review.catalog !== "UNKNOWN") {
         const [entity, id] = review.catalog.split(":");

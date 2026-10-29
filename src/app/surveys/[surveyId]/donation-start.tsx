@@ -1,0 +1,9 @@
+"use client";
+import { useState } from "react";
+export default function DonationStart({surveyId,synthetic}:{surveyId:string;synthetic:boolean}){
+ const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
+ async function begin(source:"linkedin"|"synthetic"){
+  setBusy(true);setError("");try{const r=await fetch(`/api/surveys/${surveyId}/donation`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({begin:source})});if(!r.ok)throw new Error();window.location.assign(new URL(`/surveys/${surveyId}/participate`,window.location.origin).href);}catch{setError("Teilnahme konnte nicht gestartet werden. Bitte Befragungsstatus und gegebenenfalls eine bereits gespeicherte Teilnahme prüfen.");setBusy(false);}
+ }
+ return <section><h2>Freiwillig teilnehmen</h2><p>Zur Prüfung werden EDUCATION und POSITIONS einmalig abgerufen. Die Portability-Autorisierung bei LinkedIn ist umfassender als diese beiden Domänen. Tokens bleiben kurzzeitig auf dem Server; Quelldaten bleiben im Browserentwurf. Erst nach beiden ausdrücklichen Bestätigungen wird der kanonische Beitrag gespeichert. Kontaktdaten sind nicht erforderlich.</p><p>Dies ist ein Entwicklungsprototyp. Individuelle Profile und Ergebnisse werden ausschließlich dem berechtigten Betreiber zugänglich. Verlasse die Seite zum Abbrechen; für bereits gespeicherte Testbeiträge kontaktiere den lokalen Betreiber zur Löschung. Keine produktive Datenspende vor Festlegung der Verarbeitungs- und Aufbewahrungsregeln.</p><button disabled={busy} onClick={()=>void begin("linkedin")}>Mit LinkedIn-Datenspende beginnen</button>{synthetic&&<><p>Separater Test ohne Providerzugriff und ohne echte Personendaten:</p><button disabled={busy} onClick={()=>void begin("synthetic")}>Mit synthetischem Testprofil beginnen</button></>}{error&&<p role="alert">{error}</p>}</section>;
+}

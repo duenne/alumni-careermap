@@ -1,0 +1,23 @@
+.stack { display: grid; gap: 1rem; min-width: 0; }
+.field { display: grid; gap: .4rem; min-width: 0; }
+.stack > p:empty { display: none; }
+.card { border: 1px solid #dedede; border-radius: 6px; padding: clamp(1rem, 3vw, 1.5rem); background: #fff; min-width: 0; }
+.card h2, .card h3 { margin-top: 0; }
+.stack label { display: grid; gap: .4rem; font-weight: 600; min-width: 0; }
+.stack input, .stack select { width: 100%; min-width: 0; padding: .65rem; min-height: 44px; font: inherit; border: 1px solid #777; border-radius: 4px; background: #fff; color: #262626; }
+.stack button { padding: .65rem 1rem; min-height: 44px; font: inherit; font-weight: 600; border: 1px solid #912034; border-radius: 4px; background: #b32338; color: #fff; cursor: pointer; justify-self: start; }
+.stack button:disabled { opacity: .55; cursor: default; }
+.stack :is(button, input, select):focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.stack fieldset { min-width: 0; border: 1px solid #aaa; padding: 1rem; }
+.stack .choice { display: flex; align-items: start; gap: .75rem; font-weight: 400; }
+.choice input { width: 1.2rem; min-height: 1.2rem; flex-shrink: 0; margin-top: .2rem; }
+.actions { display: flex; gap: .75rem 1rem; align-items: center; flex-wrap: wrap; margin-block: 1rem; }
+.journeySteps { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; list-style: none; padding: 0; margin: 1.5rem 0; }
+.journeySteps li { display: flex; gap: .5rem; align-items: center; padding: .75rem; border: 1px solid #ccc; border-radius: 4px; font-size: .875rem; }
+.journeySteps li[aria-current] { border: 2px solid #b32338; font-weight: 700; background: #fff; }
+.journeySteps li[data-complete] { background: #edf5eb; }
+.stepNumber { font-weight: 700; }
+.context { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; }
+.context dt { font-weight: 600; }
+.context dd { margin: 0; }
+@media (max-width: 30rem) { .context { grid-template-columns: 1fr; gap: .25rem; } .context dd { margin-bottom: .75rem; } }
