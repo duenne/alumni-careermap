@@ -39,7 +39,7 @@ export async function listSurveyAdministration(client: PrismaClient, configurati
     client.institution.findMany({ where: { id: scope.institutionId }, select: {
       id: true, name: true, programs: { where, select: { id: true, name: true, faculty: true }, orderBy: [{ name: "asc" }, { id: "asc" }] },
     } }),
-    client.survey.findMany({ where: { referenceProgram: where }, select: surveySelect, orderBy: [{ createdAt: "desc" }, { id: "asc" }] }),
+    client.survey.findMany({ where: { referenceProgram: where }, select: { ...surveySelect, _count: { select: { responses: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }] }),
   ]);
   return { institutions, surveys, facultyScope: scope.kind === "FACULTY" ? scope.faculty : null };
 }

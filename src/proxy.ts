@@ -3,6 +3,7 @@ import { allowDevImport, allowDevImportPage, allowLinkedInCallback } from "./lib
 import { allowAnalytics } from "./lib/analytics/access";
 import { surveyAccess, surveyAccessResponse, surveyHeaders } from "./lib/surveys/access";
 import { integratedJourneyEnabled, journeyOrigin } from "./lib/donation/entry-config";
+import { localDemoRequested } from "./lib/local-demo/config";
 
 function unifiedJourney(request: NextRequest) {
   if (!integratedJourneyEnabled() || !["GET", "HEAD"].includes(request.method)) return;
@@ -27,6 +28,8 @@ function unifiedJourney(request: NextRequest) {
  * This is a local development gate, not participant authorization.
  */
 export function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (localDemoRequested() && (path.startsWith("/dev/") || path.startsWith("/api/dev/") || path.startsWith("/auth/") || path.endsWith("/participate"))) return surveyAccessResponse(404);
   const unified = unifiedJourney(request);
   if (unified) return unified;
   if (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "/review") {

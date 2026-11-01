@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { mappingClient } from "../../../lib/career-import/sandbox-db";
+import { surveyClient } from "../../../lib/surveys/client";
 import { surveyAccess, surveyConfiguration } from "../../../lib/surveys/access";
 import { isSurveyId, readSurveyInvitation } from "../../../lib/surveys/service";
 import DonationStart from "./donation-start";
@@ -13,7 +13,7 @@ export default async function SurveyEntryPage({ params, searchParams }: { params
   const { surveyId } = await params;
   if (!isSurveyId(surveyId)) notFound();
   let context;
-  try { context = await readSurveyInvitation(await mappingClient(), surveyId, surveyConfiguration()); }
+  try { context = await readSurveyInvitation(await surveyClient(), surveyId, surveyConfiguration()); }
   catch { return <main id="inhalt" tabIndex={-1}><h1>Befragung derzeit nicht verfügbar</h1><p>Bitte versuchen Sie es später erneut.</p></main>; }
   if (!context) notFound();
   const sessionMissing = (await searchParams)?.session === "missing";

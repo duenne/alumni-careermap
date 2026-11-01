@@ -102,6 +102,7 @@ export default function SurveyManager() {
           <a href={`/admin/surveys/${survey.id}/analytics`}>Bestätigte Antworten auswerten</a>
           <p>{survey.referenceProgram.institution.name} · {survey.referenceProgram.name}{survey.referenceProgram.faculty ? ` · ${survey.referenceProgram.faculty}` : ""}</p>
           <p><strong>Status: {statusLabels[survey.status]} ({survey.status})</strong></p>
+          <p>Antworten: {survey._count.responses}</p>
           <p className="demoNote">Der Referenzstudiengang ist seit Anlage festgelegt.</p>
           <div className={styles.actions}>
             {survey.status !== "OPEN" && <button disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "OPEN" }, `„${survey.name}“ geöffnet.`)}>{survey.status === "CLOSED" ? "Wieder öffnen" : "Befragung öffnen"}</button>}
