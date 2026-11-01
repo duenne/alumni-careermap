@@ -3,6 +3,15 @@ import { localDemoEnvironment } from "../../../tests/support/local-demo";
 import { assertLocalDemoStartArguments, readLocalDemoConfiguration } from "./config";
 
 describe("D1.4b closed production demo configuration", () => {
+  it("permits explicit private LinkedIn credentials only in participation mode while preserving the registered loopback callback", () => {
+    const env = { ...localDemoEnvironment(), CAREERMAP_LOCAL_DEMO: "v5-participation", CAREERMAP_LOCAL_DEMO_PURPOSE: "LOCAL_PARTICIPATION", CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: "44444444-4444-4444-8444-444444444444",
+      CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID: "synthetic-client", CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: "synthetic-secret", CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: "http://localhost:3100/auth/linkedin/portability/callback" };
+    expect(readLocalDemoConfiguration(env).linkedIn).toMatchObject({ mode: "third_party", scope: "r_dma_portability_3rd_party", redirectUri: env.CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI });
+    expect(() => readLocalDemoConfiguration({ ...env, CAREERMAP_LOCAL_DEMO: "v5-synthetic" })).toThrow();
+    expect(() => readLocalDemoConfiguration({ ...env, CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: "" })).toThrow();
+    expect(() => readLocalDemoConfiguration({ ...env, CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: "https://foreign.invalid/callback" })).toThrow();
+    expect(() => readLocalDemoConfiguration({ ...env, LINKEDIN_CLIENT_SECRET: "uncontrolled-inherited-secret" })).toThrow();
+  });
   it("accepts only an explicit synthetic production installation", () => {
     const result = readLocalDemoConfiguration(localDemoEnvironment());
     expect(result).toMatchObject({ mode: "v5-synthetic", origin: "http://127.0.0.1:3114", installationId: "11111111-1111-4111-8111-111111111111",

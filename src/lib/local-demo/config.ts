@@ -1,16 +1,20 @@
 import { validateOperatorScope, type OperatorScope } from "../operator-scope";
 import { validateDemoDatabaseUrl } from "../demo-seed/safety";
+import type { LinkedInConfig } from "../dev-import/linkedin/config";
 
 export type DemoEnvironment = Record<string, string | undefined>;
 export type LocalDemoConfiguration = {
-  mode: "v5-synthetic"; installationId: string; origin: string; databaseUrl: string;
+  mode: "v5-synthetic" | "v5-participation"; installationId: string; origin: string; databaseUrl: string;
+  participationSurveyId?: string;
+  linkedIn?: LinkedInConfig;
   pilotProgramId: string; operatorScope: OperatorScope; administratorPassword: string;
 };
 export const localDemoRequested = (env: DemoEnvironment = process.env) => env.CAREERMAP_LOCAL_DEMO !== undefined;
 export const localDemoInstitutionName = (id: string) => `SYNTHETISCH / DEMO – V5 ${id}`;
+export const localLinkedInRuntimeKeys = ["CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID", "CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET", "CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI"] as const;
 export const demoRuntimeKeys = ["NODE_ENV", "CAREERMAP_LOCAL_DEMO", "CAREERMAP_LOCAL_DEMO_PURPOSE", "CAREERMAP_LOCAL_DEMO_INSTALLATION_ID",
   "CAREERMAP_LOCAL_DEMO_ORIGIN", "CAREERMAP_LOCAL_DEMO_DATABASE_URL", "CAREERMAP_LOCAL_DEMO_OPERATOR_ID", "CAREERMAP_LOCAL_DEMO_MSI_PROGRAM_ID",
-  "CAREERMAP_LOCAL_DEMO_OPERATOR_KIND", "CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY", "CAREERMAP_SURVEY_ADMIN_TOKEN"] as const;
+  "CAREERMAP_LOCAL_DEMO_OPERATOR_KIND", "CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY", "CAREERMAP_SURVEY_ADMIN_TOKEN", "CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID", ...localLinkedInRuntimeKeys] as const;
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export class LocalDemoConfigurationError extends Error {
   constructor() { super("INVALID_LOCAL_DEMO_CONFIGURATION"); this.name = "LocalDemoConfigurationError"; }
@@ -29,7 +33,20 @@ export function assertLocalDemoStartArguments(args: string[], config: LocalDemoC
  */
 export function readLocalDemoConfiguration(env: DemoEnvironment = process.env): LocalDemoConfiguration {
   try {
-    if (env.NODE_ENV !== "production" || env.CAREERMAP_LOCAL_DEMO !== "v5-synthetic" || env.CAREERMAP_LOCAL_DEMO_PURPOSE !== "SYNTHETIC_DEMO_ONLY") throw new Error();
+    const participation = env.CAREERMAP_LOCAL_DEMO === "v5-participation";
+    if (env.NODE_ENV !== "production" || (!participation && env.CAREERMAP_LOCAL_DEMO !== "v5-synthetic")
+      || env.CAREERMAP_LOCAL_DEMO_PURPOSE !== (participation ? "LOCAL_PARTICIPATION" : "SYNTHETIC_DEMO_ONLY")) throw new Error();
+    const participationSurveyId = env.CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID;
+    if (participation ? !uuid(participationSurveyId) : participationSurveyId !== undefined) throw new Error();
+    let linkedIn: LinkedInConfig | undefined;
+    if (localLinkedInRuntimeKeys.some(key => env[key] !== undefined)) {
+      if (!participation || localLinkedInRuntimeKeys.some(key => !env[key]?.trim())) throw new Error();
+      const redirectUri = env.CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI!;
+      const callback = new URL(redirectUri);
+      if (!["http:", "https:"].includes(callback.protocol) || !["localhost", "127.0.0.1"].includes(callback.hostname)
+        || callback.username || callback.password || callback.pathname !== "/auth/linkedin/portability/callback" || callback.search || callback.hash) throw new Error();
+      linkedIn = { mode: "third_party", scope: "r_dma_portability_3rd_party", clientId: env.CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID!, clientSecret: env.CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET!, redirectUri };
+    }
     for (const [key, value] of Object.entries(env)) {
       if (!value || value === "0") continue;
       if (key.startsWith("CAREERMAP_DEV_") || /^CAREERMAP_.*_E2E(?:_|$)/.test(key) || key.startsWith("LINKEDIN_")
@@ -53,7 +70,7 @@ export function readLocalDemoConfiguration(env: DemoEnvironment = process.env): 
     if (kind !== "FACULTY" && env.CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY !== undefined) throw new Error();
     const operatorScope = validateOperatorScope({ kind, institutionId: env.CAREERMAP_LOCAL_DEMO_OPERATOR_ID,
       ...(kind === "FACULTY" ? { faculty: env.CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY } : {}) });
-    return { mode: "v5-synthetic", installationId: installationId.toLowerCase(), pilotProgramId: pilotProgramId.toLowerCase(), origin,
-      databaseUrl, administratorPassword, operatorScope };
+    return { mode: participation ? "v5-participation" : "v5-synthetic", ...(participation ? { participationSurveyId: participationSurveyId!.toLowerCase() } : {}), installationId: installationId.toLowerCase(), pilotProgramId: pilotProgramId.toLowerCase(), origin,
+      databaseUrl, administratorPassword, operatorScope, ...(linkedIn ? { linkedIn } : {}) };
   } catch { throw new LocalDemoConfigurationError(); }
 }

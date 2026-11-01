@@ -10,6 +10,7 @@ try {
   let result;
   if (command === "seed" && args.length === 1 && args[0] === "--confirm-synthetic-references") result = await ops.seed(true);
   else if (command === "record-b" && args.length === 2 && args[0] === "--survey-id") result = await ops.recordB(args[1]);
+  else if (command === "enable-participation" && args.length === 2 && args[0] === "--survey-id") result = await ops.enableParticipation(args[1]);
   else if (!args.length) {
     switch (command) {
       case "init": result = await ops.init(); break;
@@ -23,6 +24,7 @@ try {
       case "db-restart": result = await ops.dbRestart(); break;
       case "db-recreate": result = await ops.dbRestart(true); break;
       case "verify": result = await ops.verify(); break;
+      case "enable-linkedin": result = await ops.enableLinkedIn(); break;
       default: throw new InstallationError("INVALID_DEMO_OPERATION");
     }
   } else throw new InstallationError("INVALID_DEMO_OPERATION");

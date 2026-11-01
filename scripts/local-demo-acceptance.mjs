@@ -112,6 +112,7 @@ try {
     await page.goto(`${origin}/admin/surveys`);
     await expect(page.getByRole("heading", { name: "Vorhandene Befragungen" })).toBeVisible();
     if (!i.surveyBId) {
+      await page.getByRole("button", { name: "Neu anlegen", exact: true }).click();
       // Existing catalog entries are inspected before creating anything.
       const administration = await (await operator.request.get(`${origin}/api/admin/surveys`)).json();
       assert.equal(administration.surveys.length, 1, "Unrecorded survey exists; inspect instead of duplicating B");

@@ -18,10 +18,10 @@ export class EphemeralLinkedInSessions {
   purge() {
     for (const [id, session] of this.sessions) if (session.expires <= Date.now()) this.remove(id);
   }
-  create(key: string) {
+  create(key: string, statePrefix = "") {
     this.purge();
     if (this.sessions.size >= 32) return null;
-    const id = random(); const state = random();
+    const id = random(); const state = statePrefix + random();
     this.sessions.set(id, { id, key, expires: Date.now() + SESSION_SECONDS * 1000, stateHash: hash(state), stateExpires: Date.now() + 5 * 60_000 });
     return { id, state };
   }

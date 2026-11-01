@@ -3,7 +3,7 @@ import { allowDevImport, allowDevImportPage, allowLinkedInCallback } from "./lib
 import { allowAnalytics } from "./lib/analytics/access";
 import { surveyAccess, surveyAccessResponse, surveyHeaders } from "./lib/surveys/access";
 import { integratedJourneyEnabled, journeyOrigin } from "./lib/donation/entry-config";
-import { localDemoRequested } from "./lib/local-demo/config";
+import { localDemoRequested, readLocalDemoConfiguration } from "./lib/local-demo/config";
 
 function unifiedJourney(request: NextRequest) {
   if (!integratedJourneyEnabled() || !["GET", "HEAD"].includes(request.method)) return;
@@ -29,6 +29,14 @@ function unifiedJourney(request: NextRequest) {
  */
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  if (localDemoRequested() && path === "/auth/linkedin/portability/callback" && request.method === "GET" && request.cookies.has("careermap_manual_participation")) {
+    try {
+      if (readLocalDemoConfiguration().linkedIn && surveyAccess(request.headers, false) === 200) {
+        const response = NextResponse.next(); for (const [name, value] of Object.entries(surveyHeaders)) response.headers.set(name, value); return response;
+      }
+    } catch { /* Keep the unavailable callback closed. */ }
+    return surveyAccessResponse(404);
+  }
   if (localDemoRequested() && (path.startsWith("/dev/") || path.startsWith("/api/dev/") || path.startsWith("/auth/") || path.endsWith("/participate"))) return surveyAccessResponse(404);
   const unified = unifiedJourney(request);
   if (unified) return unified;
@@ -48,7 +56,7 @@ export function proxy(request: NextRequest) {
     if (access !== 200) return surveyAccessResponse(access);
     const response = NextResponse.next();
     for (const [name, value] of Object.entries(surveyHeaders)) response.headers.set(name, value);
-    if(request.nextUrl.pathname.endsWith("/participate")) response.headers.set("Referrer-Policy","same-origin");
+    if(request.nextUrl.pathname.endsWith("/participate") || request.nextUrl.pathname.endsWith("/participation")) response.headers.set("Referrer-Policy","same-origin");
     return response;
   }
   if (request.nextUrl.pathname.startsWith("/dev/analytics")) {

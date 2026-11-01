@@ -51,6 +51,23 @@ async function connect(app: ReturnType<typeof setup>) {
 }
 
 describe("V1b OAuth routes and temporary server sessions", () => {
+  it("uses a cookie-bound prefixed state and the unchanged registered callback when an explicitly allowed local participation relay is used", async () => {
+    const app = setup(), applicationOrigin = "http://127.0.0.1:3114";
+    const handlers = createLinkedInHandlers({ config: () => config, provider: () => app.provider, store: app.store }, {
+      statePrefix: "participation_v1_", apiPath: "/api/participation/linkedin", cookieName: "careermap_linkedin_participation",
+      allowed: () => true, acceptRequestOrigin: request => request.headers.get("host") === "127.0.0.1:3114",
+      returnPath: () => "/surveys/synthetic-survey/participation",
+    });
+    const start = await handlers.POST(new NextRequest(`${applicationOrigin}/api/participation/linkedin/start`, { method: "POST", headers: { host: "127.0.0.1:3114", origin: applicationOrigin } }));
+    expect(start.status).toBe(303);
+    const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
+    expect(state).toMatch(/^participation_v1_/);
+    const callback = await handlers.GET(new NextRequest(`${applicationOrigin}/auth/linkedin/portability/callback?state=${state}&code=synthetic-code`, { headers: { host: "127.0.0.1:3114", cookie: cookieOf(start) } }));
+    expect(callback.headers.get("location")).toBe(`${applicationOrigin}/surveys/synthetic-survey/participation?linkedin=connected`);
+    expect(app.provider.exchange).toHaveBeenCalledOnce();
+    const replay = await handlers.GET(new NextRequest(`${applicationOrigin}/auth/linkedin/portability/callback?state=${state}&code=synthetic-code`, { headers: { host: "127.0.0.1:3114", cookie: cookieOf(start) } }));
+    expect(replay.headers.get("location")).toContain("INVALID_STATE"); expect(app.provider.exchange).toHaveBeenCalledOnce();
+  });
   it("keeps the registered callback fixed and returns to the survey only after validating OAuth state", async () => {
     const app = setup();
     app.provider.authorizationUrl = createLinkedInProvider(config).authorizationUrl;

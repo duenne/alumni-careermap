@@ -5,7 +5,7 @@ import { assertLocalDemoStartArguments, readLocalDemoConfiguration } from "./src
 
 const localDemo = process.env.CAREERMAP_LOCAL_DEMO !== undefined;
 if (localDemo) {
-  if (process.env.CAREERMAP_LOCAL_DEMO !== "v5-synthetic" || process.env.NODE_ENV !== "production") throw new Error("Invalid local demo build profile");
+  if (!["v5-synthetic", "v5-participation"].includes(process.env.CAREERMAP_LOCAL_DEMO ?? "") || process.env.NODE_ENV !== "production") throw new Error("Invalid local demo build profile");
   assertDemoWorkspace(process.cwd());
 }
 

@@ -4,6 +4,7 @@ test("operator adds a faculty/program and participants explicitly accept local c
  const user = await browser.newContext({ baseURL });
  try {
   const p = await admin.newPage(); await p.goto("/admin/surveys");
+  await p.getByRole("button", { name: "Neu anlegen", exact: true }).click();
   await p.getByLabel("Fakultät (optional)", { exact: true }).fill("Synthetic Added Faculty");
   const name = `Synthetic Added Program ${info.project.name}`;
   await p.getByLabel("Name des neuen Studiengangs", { exact: true }).fill(name);
@@ -63,6 +64,7 @@ test("survey invitation -> reviewed synthetic careers -> one confirmed response 
  try{
   const p=await admin.newPage();await p.goto("/");await expect(p.getByRole("heading",{name:"Eine gemeinsame Journey"})).toBeVisible();await p.getByRole("link",{name:"Befragungen verwalten",exact:true}).click();
   const ids:string[]=[];let dashboardPath="";
+  await p.getByRole("button",{name:"Neu anlegen",exact:true}).click();
   for(const suffix of ["A","B"]){
    await p.getByLabel("Hochschule",{exact:true}).selectOption({label:"Synthetic Mapping Institute"});
    await p.getByLabel("Studiengang",{exact:true}).selectOption({label:"Management Sozialer Innovationen · Synthetic Survey Faculty"});

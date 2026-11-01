@@ -4,8 +4,29 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createInstallation, loadInstallation, saveInstallation, runtimeConfiguration, assertVolumeIdentity, assertContainerIdentity, assertClusterIdentity } from "./installation";
 import { readLocalDemoConfiguration } from "./config";
+it("activates manual participation only for the recorded independent survey and persists matching runtime configuration", () => {
+  const root = location(), { installation } = createInstallation(root, bootstrap);
+  const a = "44444444-4444-4444-8444-444444444444", b = "55555555-5555-4555-8555-555555555555";
+  saveInstallation(root, { ...installation, surveyAId: a, surveyBId: b });
+  expect(() => saveInstallation(root, { ...loadInstallation(root).installation, participationSurveyId: a })).toThrow();
+  saveInstallation(root, { ...loadInstallation(root).installation, participationSurveyId: b });
+  const loaded = loadInstallation(root);
+  expect(readLocalDemoConfiguration(runtimeConfiguration(loaded.installation, loaded.secrets))).toMatchObject({ mode: "v5-participation", participationSurveyId: b });
+});
 const bootstrap = { image: `postgres@sha256:${"a".repeat(64)}`, imageId: `sha256:${"b".repeat(64)}`, dockerEndpoint: "unix:///synthetic/docker.sock", composeSha256: "c".repeat(64) };
 const location = () => join(mkdtempSync(join(tmpdir(), "careermap-install-test-")), "v5");
+it("loads optional LinkedIn credentials only from a private file after explicit participation activation", () => {
+  const root = location(), { installation: i } = createInstallation(root, bootstrap);
+  const surveyBId = "55555555-5555-4555-8555-555555555555";
+  saveInstallation(root, { ...i, surveyBId, participationSurveyId: surveyBId });
+  expect(() => saveInstallation(root, { ...loadInstallation(root).installation, linkedInEnabled: true })).toThrow();
+  writeFileSync(join(root, "linkedin.json"), JSON.stringify({ clientId: "synthetic-client", clientSecret: "synthetic-secret", redirectUri: "http://localhost:3100/auth/linkedin/portability/callback" }), { mode: 0o600 });
+  saveInstallation(root, { ...loadInstallation(root).installation, linkedInEnabled: true });
+  const loaded = loadInstallation(root);
+  expect(readLocalDemoConfiguration(runtimeConfiguration(loaded.installation, loaded.secrets)).linkedIn?.redirectUri).toBe("http://localhost:3100/auth/linkedin/portability/callback");
+  expect(JSON.stringify(loaded.installation)).not.toMatch(/synthetic-secret|synthetic-client/);
+  chmodSync(join(root, "linkedin.json"), 0o644); expect(() => loadInstallation(root)).toThrow();
+});
 describe("D1.4c installation ownership and persistence metadata", () => {
   it("creates stable private synthetic identities and separate credentials without normal DB env", () => {
     const root = location(), first = createInstallation(root, bootstrap), loaded = loadInstallation(root);

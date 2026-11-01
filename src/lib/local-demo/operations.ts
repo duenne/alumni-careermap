@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
+import { parse as parseEnvironment } from "dotenv";
 import type { PrismaClient } from "../../generated/prisma/client";
 import { assertDemoWorkspace, demoBuildEnvironment, markDemoBuildComplete, prepareDemoBuild } from "./build-workspace";
 import { localDemoInstitutionName, readLocalDemoConfiguration } from "./config";
@@ -177,6 +178,7 @@ export class LocalDemoOperations {
     return { sourceText, expectedText, policy: "v5-demo-phase-d-100-v1", referenceProgramId: i.pilotProgramId };
   }
   async seed(confirmed: boolean) {
+    if (this.context().installation.participationSurveyId) fail("PARTICIPATION_MODE_BLOCKS_SEED");
     if (!confirmed) fail("SYNTHETIC_REFERENCE_CONFIRMATION_REQUIRED");
     await this.runtime(async (client, i) => { if (i.surveyAId && !await client.survey.findUnique({ where: { id: i.surveyAId } })) fail("SEEDED_DEMO_SURVEY_MISSING"); });
     const { installation: i, secrets: s } = this.context();
@@ -254,9 +256,44 @@ export class LocalDemoOperations {
       saveInstallation(this.root, { ...i, surveyBId: b.id }); return { surveyB: b.id, status: "DRAFT", responses: 0 };
     });
   }
+  async enableParticipation(surveyId: string) {
+    const { installation } = this.context();
+    if (this.server()) fail("STOP_DEMO_BEFORE_PARTICIPATION_CHANGE");
+    if (!uuid(surveyId) || surveyId !== installation.surveyBId || surveyId === installation.surveyAId) fail("INVALID_PARTICIPATION_SURVEY");
+    return this.runtime(async (client, i) => {
+      const survey = await client.survey.findUnique({ where: { id: surveyId }, select: { status: true, referenceProgram: { select: { institutionId: true } } } });
+      if (!survey || survey.status !== "OPEN" || survey.referenceProgram.institutionId !== i.operatorId) fail("PARTICIPATION_SURVEY_NOT_OPEN");
+      saveInstallation(this.root, { ...i, participationSurveyId: surveyId });
+      return { participation: "enabled", surveyId, origin: `http://127.0.0.1:${i.appPort}`, input: "manual", storage: "persistent" };
+    });
+  }
+  async enableLinkedIn() {
+    const { installation: i, secrets } = this.context();
+    if (this.server()) fail("STOP_DEMO_BEFORE_PARTICIPATION_CHANGE");
+    if (!i.participationSurveyId) fail("PARTICIPATION_REQUIRED_FOR_LINKEDIN");
+    // Explicitly copy only the already configured third-party app. Never
+    // inherit .env.local, NODE_OPTIONS or development DB/tool switches at start.
+    const existing = parseEnvironment(readFileSync(join(this.source, ".env.local")));
+    if (existing.LINKEDIN_PORTABILITY_MODE !== "third_party" || existing.LINKEDIN_PORTABILITY_SCOPE !== "r_dma_portability_3rd_party") fail("THIRD_PARTY_LINKEDIN_CONFIGURATION_REQUIRED");
+    const linkedIn = { clientId: existing.LINKEDIN_CLIENT_ID, clientSecret: existing.LINKEDIN_CLIENT_SECRET, redirectUri: existing.LINKEDIN_REDIRECT_URI };
+    if (Object.values(linkedIn).some(value => !value?.trim())) fail("LINKEDIN_CONFIGURATION_REQUIRED");
+    readLocalDemoConfiguration({ ...runtimeConfiguration(i, secrets), CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID: linkedIn.clientId, CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: linkedIn.clientSecret, CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: linkedIn.redirectUri });
+    const file = join(this.root, "linkedin.json");
+    if (existsSync(file)) {
+      const stat = lstatSync(file);
+      if (stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || JSON.stringify(JSON.parse(readFileSync(file, "utf8"))) !== JSON.stringify(linkedIn)) fail("EXISTING_LINKEDIN_CONFIGURATION_MISMATCH");
+    } else writeFileSync(file, JSON.stringify(linkedIn), { mode: 0o600, flag: "wx" });
+    saveInstallation(this.root, { ...i, linkedInEnabled: true });
+    return { linkedIn: "enabled", surveyId: i.participationSurveyId, callback: linkedIn.redirectUri, storage: "temporary-server-token-only" };
+  }
   async verify() {
     return this.runtime(async (client, i) => {
       if (!i.surveyAId || !i.surveyBId) fail("DEMO_ACCEPTANCE_SURVEYS_REQUIRED");
+      if (i.participationSurveyId) {
+        const surveys = await client.survey.findMany({ where: { id: { in: [i.surveyAId!, i.participationSurveyId] } }, select: { id: true, status: true, referenceProgram: { select: { institutionId: true } }, _count: { select: { responses: true } } } });
+        if (surveys.length !== 2 || surveys.some(s => s.referenceProgram.institutionId !== i.operatorId) || surveys.find(s => s.id === i.surveyAId)?.status !== "CLOSED") fail("PARTICIPATION_INSTALLATION_MISMATCH");
+        return { mode: "v5-participation", origin: `http://127.0.0.1:${i.appPort}`, surveys: surveys.map(s => ({ id: s.id, status: s.status, responses: s._count.responses })), volume: i.volumeName };
+      }
       const { verifyDemoSource } = await import("../demo-seed/source-policy");
       const { planV5DemoSeed } = await import("../demo-seed/plan");
       const { assertPersistedDemoMatches } = await import("../demo-seed/reconcile");

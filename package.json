@@ -35,6 +35,7 @@
     "test:integration": "node scripts/test-integration.mjs",
     "test:demo-seed": "node scripts/test-demo-seed.mjs",
     "test:local-demo": "node scripts/test-local-demo.mjs",
+    "test:e2e:participation": "node --import tsx scripts/test-manual-participation.mjs --linkedin",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",

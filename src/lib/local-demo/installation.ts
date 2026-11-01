@@ -8,9 +8,10 @@ export type Installation = {
   version: 1; purpose: "SYNTHETIC_DEMO_ONLY"; installationId: string; operatorId: string; pilotProgramId: string;
   projectName: string; volumeName: string; image: string; imageId: string; dockerEndpoint: string; composeSha256: string;
   appPort: number; dbPort: number; volumeReady: boolean; clusterId?: string; databaseOid?: number;
-  buildPath?: string; surveyAId?: string; surveyBId?: string;
+  buildPath?: string; surveyAId?: string; surveyBId?: string; participationSurveyId?: string; linkedInEnabled?: true;
 };
-export type InstallationSecrets = { adminDatabasePassword: string; databasePassword: string; administratorPassword: string };
+export type LocalLinkedInCredentials = { clientId: string; clientSecret: string; redirectUri: string };
+export type InstallationSecrets = { adminDatabasePassword: string; databasePassword: string; administratorPassword: string; linkedIn?: LocalLinkedInCredentials };
 export class InstallationError extends Error { constructor(readonly code = "INVALID_DEMO_INSTALLATION") { super(code); this.name = "InstallationError"; } }
 const fail = (code?: string): never => { throw new InstallationError(code); };
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(v);
@@ -25,7 +26,7 @@ function privatePath(path: string, directory = false) {
 }
 function validInstallation(v: unknown): v is Installation {
   if (!record(v)) return false;
-  const allowed = ["version", "purpose", "installationId", "operatorId", "pilotProgramId", "projectName", "volumeName", "image", "imageId", "dockerEndpoint", "composeSha256", "appPort", "dbPort", "volumeReady", "clusterId", "databaseOid", "buildPath", "surveyAId", "surveyBId"];
+  const allowed = ["version", "purpose", "installationId", "operatorId", "pilotProgramId", "projectName", "volumeName", "image", "imageId", "dockerEndpoint", "composeSha256", "appPort", "dbPort", "volumeReady", "clusterId", "databaseOid", "buildPath", "surveyAId", "surveyBId", "participationSurveyId", "linkedInEnabled"];
   return Object.keys(v).every(k => allowed.includes(k)) && v.version === 1 && v.purpose === "SYNTHETIC_DEMO_ONLY"
     && uuid(v.installationId) && uuid(v.operatorId) && uuid(v.pilotProgramId)
     && v.projectName === `careermap-v5-${v.installationId}` && v.volumeName === `careermap_v5_${v.installationId.replaceAll("-", "")}_pg17`
@@ -37,10 +38,21 @@ function validInstallation(v: unknown): v is Installation {
     && (v.clusterId === undefined || typeof v.clusterId === "string" && /^\d+$/.test(v.clusterId))
     && (v.databaseOid === undefined || Number.isSafeInteger(v.databaseOid) && Number(v.databaseOid) > 0)
     && (v.buildPath === undefined || typeof v.buildPath === "string" && /^builds\/[a-f0-9-]{36}\/app$/.test(v.buildPath))
-    && (v.surveyAId === undefined || uuid(v.surveyAId)) && (v.surveyBId === undefined || uuid(v.surveyBId));
+    && (v.surveyAId === undefined || uuid(v.surveyAId)) && (v.surveyBId === undefined || uuid(v.surveyBId))
+    && (v.participationSurveyId === undefined || uuid(v.participationSurveyId) && v.participationSurveyId === v.surveyBId && v.participationSurveyId !== v.surveyAId)
+    && (v.linkedInEnabled === undefined || v.linkedInEnabled === true && uuid(v.participationSurveyId));
+}
+function readPrivateLinkedIn(root: string): LocalLinkedInCredentials {
+  const path = join(root, "linkedin.json"); privatePath(path);
+  const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (!record(value) || Object.keys(value).sort().join() !== "clientId,clientSecret,redirectUri" || Object.values(value).some(v => typeof v !== "string" || !v.trim())) return fail("INVALID_LINKEDIN_CONFIGURATION");
+  return value as LocalLinkedInCredentials;
 }
 export function runtimeConfiguration(i: Installation, s: InstallationSecrets): Record<string, string> {
-  return { NODE_ENV: "production", CAREERMAP_LOCAL_DEMO: "v5-synthetic", CAREERMAP_LOCAL_DEMO_PURPOSE: "SYNTHETIC_DEMO_ONLY",
+  if (i.linkedInEnabled && !s.linkedIn) fail("LINKEDIN_CONFIGURATION_REQUIRED");
+  return { NODE_ENV: "production", CAREERMAP_LOCAL_DEMO: i.participationSurveyId ? "v5-participation" : "v5-synthetic", CAREERMAP_LOCAL_DEMO_PURPOSE: i.participationSurveyId ? "LOCAL_PARTICIPATION" : "SYNTHETIC_DEMO_ONLY",
+    ...(i.participationSurveyId ? { CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: i.participationSurveyId } : {}),
+    ...(i.linkedInEnabled ? { CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID: s.linkedIn!.clientId, CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: s.linkedIn!.clientSecret, CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: s.linkedIn!.redirectUri } : {}),
     CAREERMAP_LOCAL_DEMO_INSTALLATION_ID: i.installationId, CAREERMAP_LOCAL_DEMO_OPERATOR_ID: i.operatorId,
     CAREERMAP_LOCAL_DEMO_MSI_PROGRAM_ID: i.pilotProgramId, CAREERMAP_LOCAL_DEMO_OPERATOR_KIND: "INSTITUTION",
     CAREERMAP_LOCAL_DEMO_ORIGIN: `http://127.0.0.1:${i.appPort}`,
@@ -54,7 +66,9 @@ export function loadInstallation(root: string): { installation: Installation; se
     const secrets: unknown = JSON.parse(readFileSync(join(root, "secrets.json"), "utf8"));
     if (!validInstallation(installation) || !record(secrets) || Object.keys(secrets).sort().join() !== "adminDatabasePassword,administratorPassword,databasePassword"
       || Object.values(secrets).some(v => typeof v !== "string" || !/^[a-f0-9]{64}$/.test(v)) || new Set(Object.values(secrets)).size !== 3) return fail();
-    const typed = secrets as InstallationSecrets, expected = runtimeConfiguration(installation, typed);
+    const typed = secrets as InstallationSecrets;
+    if (installation.linkedInEnabled) typed.linkedIn = readPrivateLinkedIn(root);
+    const expected = runtimeConfiguration(installation, typed);
     if (readFileSync(join(root, "admin-password"), "utf8") !== typed.adminDatabasePassword) return fail();
     if (JSON.stringify(JSON.parse(readFileSync(join(root, "runtime.json"), "utf8"))) !== JSON.stringify(expected)) return fail();
     readLocalDemoConfiguration(expected);
@@ -79,12 +93,19 @@ export function createInstallation(root: string, bootstrap: Bootstrap) {
   return loadInstallation(root);
 }
 export function saveInstallation(root: string, next: Installation) {
-  const { installation: old } = loadInstallation(root);
+  const { installation: old, secrets } = loadInstallation(root);
   if (!validInstallation(next) || ["installationId", "operatorId", "pilotProgramId", "projectName", "volumeName", "image", "imageId", "dockerEndpoint", "composeSha256", "appPort", "dbPort"].some(k => old[k as keyof Installation] !== next[k as keyof Installation])
     || old.volumeReady && !next.volumeReady || old.clusterId && old.clusterId !== next.clusterId || old.databaseOid && old.databaseOid !== next.databaseOid
     || old.surveyAId && old.surveyAId !== next.surveyAId || old.surveyBId && old.surveyBId !== next.surveyBId) fail();
+  if (next.linkedInEnabled) secrets.linkedIn = readPrivateLinkedIn(root);
+  const nextRuntime = runtimeConfiguration(next, secrets);
+  readLocalDemoConfiguration(nextRuntime);
   const temporary = join(root, `.installation-${randomUUID()}.tmp`);
   writeFileSync(temporary, JSON.stringify(next), { flag: "wx", mode: 0o600 }); renameSync(temporary, join(root, "installation.json"));
+  // The legacy purpose/volume labels identify the original bootstrap. The
+  // explicit runtime mode determines whether the independent survey accepts data.
+  const runtime = join(root, `.runtime-${randomUUID()}.tmp`);
+  writeFileSync(runtime, JSON.stringify(nextRuntime), { flag: "wx", mode: 0o600 }); renameSync(runtime, join(root, "runtime.json"));
 }
 
 export function assertVolumeIdentity(actual: unknown, i: Installation): void {

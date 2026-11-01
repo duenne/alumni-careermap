@@ -12,6 +12,20 @@ const headers = (extra = {}) => new Headers({ host: "127.0.0.1:3114", ...extra }
 beforeEach(() => { for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value); });
 afterEach(() => vi.unstubAllEnvs());
 describe("D1.4b production survey access only", () => {
+  it("opens only the exact cookie-bearing participant callback after explicit LinkedIn opt-in, keeping forwarded and cross-site API requests closed", () => {
+    vi.stubEnv("CAREERMAP_LOCAL_DEMO", "v5-participation"); vi.stubEnv("CAREERMAP_LOCAL_DEMO_PURPOSE", "LOCAL_PARTICIPATION");
+    vi.stubEnv("CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID", "44444444-4444-4444-8444-444444444444");
+    vi.stubEnv("CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID", "synthetic-client"); vi.stubEnv("CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET", "synthetic-secret");
+    vi.stubEnv("CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI", "http://localhost:3100/auth/linkedin/portability/callback");
+    const navigation = { cookie: "careermap_manual_participation=synthetic-capability", "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" };
+    const request = (path = "/auth/linkedin/portability/callback", extra = {}, method = "GET") => new NextRequest(`http://127.0.0.1:3114${path}`, { method, headers: headers({ ...navigation, ...extra }) });
+    expect(proxy(request()).headers.get("x-middleware-next")).toBe("1");
+    expect(proxy(request(undefined, { "x-forwarded-for": "192.0.2.1" })).status).toBe(404);
+    expect(proxy(request(undefined, { "sec-fetch-mode": "cors", "sec-fetch-dest": "empty" })).status).toBe(404);
+    expect(proxy(request(undefined, {}, "POST")).status).toBe(404);
+    expect(proxy(request("/auth/unrelated")).status).toBe(404);
+    expect(proxy(request("/surveys/44444444-4444-4444-8444-444444444444/participation", { "sec-fetch-site": "same-origin" })).headers.get("referrer-policy")).toBe("same-origin");
+  });
   it("retains Basic authentication and takes scope only from the validated installation", () => {
     expect(surveyAccess(headers(), true)).toBe(401);
     expect(surveyAccess(headers({ authorization: "Basic invalid" }), true)).toBe(401);

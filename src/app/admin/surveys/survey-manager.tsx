@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { SurveyAdministration, SurveyContext } from "../../../lib/surveys/service";
 import styles from "../../surveys/surveys.module.css";
+import adminStyles from "./survey-manager.module.css";
+import { institutionLabel } from "../../../lib/surveys/presentation";
 
 const statusLabels = { DRAFT: "Entwurf", OPEN: "Geöffnet", CLOSED: "Geschlossen" };
 async function loadAdministration(): Promise<SurveyAdministration> {
@@ -11,6 +13,7 @@ async function loadAdministration(): Promise<SurveyAdministration> {
   return response.json();
 }
 export default function SurveyManager() {
+  const [showCreation, setShowCreation] = useState(false);
   const [data, setData] = useState<SurveyAdministration>();
   const [institutionId, setInstitutionId] = useState("");
   const [programId, setProgramId] = useState("");
@@ -52,63 +55,30 @@ export default function SurveyManager() {
     catch { setError("Kopieren nicht möglich. Bitte den Einladungslink im Textfeld markieren und kopieren."); }
   }
   const programs = data?.institutions.find(i => i.id === institutionId)?.programs ?? [];
-  return <div className={styles.stack}>
+  return <div className={`${styles.stack} ${adminStyles.manager}`}>
     <p role="status" aria-live="polite">{message}</p>
     {error && <p role="alert">{error}</p>}
     {!data && !error && <p>Befragungen werden geladen …</p>}
     {data && <>
-      <section aria-labelledby="catalog-heading" className={styles.card}>
-        <h2 id="catalog-heading">Fakultät und Studiengang ergänzen</h2>
-        <p>Neue Studiengänge gehören zur Betreiberhochschule. Eine Fakultät wird zusammen mit ihrem Studiengang erfasst; vorhandene Angaben stehen zur Auswahl. Bestehende Befragungen behalten ihren Bezug.</p>
-        <form className={styles.stack} onSubmit={event => {
-          event.preventDefault();
-          void mutate({ action: "program-create", institutionId: data.institutions[0]?.id, name: catalogName, faculty: data.facultyScope ?? (catalogFaculty.trim() || null) }, "Studiengang mit Fakultätsangabe angelegt und für neue Befragungen verfügbar.");
-        }}>
-          <p>Hochschule: {data.institutions[0]?.name ?? "Nicht konfiguriert"}</p>
-          <label>Fakultät (optional)<input maxLength={200} list="catalog-faculties" value={data.facultyScope ?? catalogFaculty} readOnly={!!data.facultyScope} onChange={event => setCatalogFaculty(event.target.value)} disabled={busy} /></label>
-          <datalist id="catalog-faculties">{[...new Set(data.institutions.flatMap(i => i.programs.flatMap(p => p.faculty ? [p.faculty] : [])))].map(faculty => <option key={faculty} value={faculty} />)}</datalist>
-          <label>Name des neuen Studiengangs<input required maxLength={200} value={catalogName} onChange={event => setCatalogName(event.target.value)} disabled={busy} /></label>
-          <button disabled={busy || !catalogName.trim() || !data.institutions.length}>Studiengang hinzufügen</button>
-        </form>
-      </section>
-      <section aria-labelledby="create-survey" className={styles.card}>
-        <h2 id="create-survey">Neue Befragung</h2>
-        <form onSubmit={create} className={styles.stack}>
-          <div className={styles.field}>
-            <label htmlFor="survey-institution">Hochschule</label>
-            <select id="survey-institution" required value={institutionId} onChange={event => { setInstitutionId(event.target.value); setProgramId(""); }} disabled={busy}>
-              <option value="">Bitte auswählen</option>
-              {data.institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="survey-program">Studiengang</label>
-            <select id="survey-program" required value={programId} onChange={event => setProgramId(event.target.value)} disabled={busy || !institutionId}>
-              <option value="">Bitte auswählen</option>
-              {programs.map(p => <option key={p.id} value={p.id}>{p.name}{p.faculty ? ` · ${p.faculty}` : ""}</option>)}
-            </select>
-          </div>
-          {institutionId && !programs.length && <p>Für diesen Betreiber sind keine Studiengänge verfügbar.</p>}
-          {!data.institutions.length && <p>Keine konfigurierte Hochschule gefunden. Bitte die Betreiberkonfiguration prüfen.</p>}
-          <label>Name der Befragung<input required maxLength={200} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></label>
-          <button type="submit" disabled={busy || !programId || !name.trim()}>Als Entwurf anlegen</button>
-        </form>
-      </section>
       <section aria-labelledby="existing-surveys" className={styles.stack}>
         <h2 id="existing-surveys">Vorhandene Befragungen</h2>
         {!data.surveys.length && <p>Noch keine Befragungen vorhanden.</p>}
-        {data.surveys.map(survey => <article key={survey.id} className={styles.card} aria-label={survey.name}>
-          <h3>{survey.name}</h3>
-          <a href={`/admin/surveys/${survey.id}/analytics`}>Bestätigte Antworten auswerten</a>
-          <p>{survey.referenceProgram.institution.name} · {survey.referenceProgram.name}{survey.referenceProgram.faculty ? ` · ${survey.referenceProgram.faculty}` : ""}</p>
-          <p><strong>Status: {statusLabels[survey.status]} ({survey.status})</strong></p>
-          <p>Antworten: {survey._count.responses}</p>
-          <p className="demoNote">Der Referenzstudiengang ist seit Anlage festgelegt.</p>
+        {data.surveys.map(survey => <article key={survey.id} className={`${styles.card} ${adminStyles.surveyCard}`} aria-label={survey.name}>
+          <div className={adminStyles.cardHeading}>
+            <h3>{survey.name}</h3>
+            <p className={adminStyles.status}><strong>Status: {statusLabels[survey.status]} ({survey.status})</strong></p>
+          </div>
+          <p>{institutionLabel(survey.referenceProgram.institution)} · {survey.referenceProgram.name}{survey.referenceProgram.faculty ? ` · ${survey.referenceProgram.faculty}` : ""}</p>
+          <div className={adminStyles.cardMeta}>
+            <p><strong>Antworten: {survey._count.responses}</strong></p>
+            <p className="demoNote">Der Referenzstudiengang ist seit Anlage festgelegt.</p>
+          </div>
           <div className={styles.actions}>
+            <a href={`/admin/surveys/${survey.id}/analytics`}>Bestätigte Antworten auswerten</a>
             {survey.status !== "OPEN" && <button disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "OPEN" }, `„${survey.name}“ geöffnet.`)}>{survey.status === "CLOSED" ? "Wieder öffnen" : "Befragung öffnen"}</button>}
             {survey.status === "OPEN" && <button disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "CLOSED" }, `„${survey.name}“ geschlossen.`)}>Befragung schließen</button>}
           </div>
-          {survey.status === "DRAFT" ? <p>Der Einladungslink wird nach dem Öffnen bereitgestellt.</p> : <div className={styles.stack}>
+          {survey.status === "DRAFT" ? <p>Der Einladungslink wird nach dem Öffnen bereitgestellt.</p> : <div className={adminStyles.invitation}>
             <label>Einladungslink<input readOnly value={`${origin}/surveys/${survey.id}`} onFocus={event => event.target.select()} /></label>
             <div className={styles.actions}>
               {survey.status === "OPEN" && <button disabled={busy} onClick={() => void copy(survey)}>Einladungslink kopieren</button>}
@@ -118,6 +88,46 @@ export default function SurveyManager() {
           </div>}
         </article>)}
       </section>
+      <button type="button" aria-expanded={showCreation} aria-controls="survey-creation" onClick={() => setShowCreation(value => !value)}>Neu anlegen</button>
+      <div id="survey-creation" hidden={!showCreation} className={`${styles.stack} ${adminStyles.creationForms}`}>
+        <section aria-labelledby="catalog-heading" className={styles.card}>
+          <h2 id="catalog-heading">Fakultät und Studiengang ergänzen</h2>
+          <p>Neue Studiengänge gehören zur Betreiberhochschule. Eine Fakultät wird zusammen mit ihrem Studiengang erfasst; vorhandene Angaben stehen zur Auswahl. Bestehende Befragungen behalten ihren Bezug.</p>
+          <form className={styles.stack} onSubmit={event => {
+            event.preventDefault();
+            void mutate({ action: "program-create", institutionId: data.institutions[0]?.id, name: catalogName, faculty: data.facultyScope ?? (catalogFaculty.trim() || null) }, "Studiengang mit Fakultätsangabe angelegt und für neue Befragungen verfügbar.");
+          }}>
+            <p>Hochschule: {data.institutions[0] ? institutionLabel(data.institutions[0]) : "Nicht konfiguriert"}</p>
+            <label>Fakultät (optional)<input maxLength={200} list="catalog-faculties" value={data.facultyScope ?? catalogFaculty} readOnly={!!data.facultyScope} onChange={event => setCatalogFaculty(event.target.value)} disabled={busy} /></label>
+            <datalist id="catalog-faculties">{[...new Set(data.institutions.flatMap(i => i.programs.flatMap(p => p.faculty ? [p.faculty] : [])))].map(faculty => <option key={faculty} value={faculty} />)}</datalist>
+            <label>Name des neuen Studiengangs<input required maxLength={200} value={catalogName} onChange={event => setCatalogName(event.target.value)} disabled={busy} /></label>
+            <button disabled={busy || !catalogName.trim() || !data.institutions.length}>Studiengang hinzufügen</button>
+          </form>
+        </section>
+        <section aria-labelledby="create-survey" className={styles.card}>
+          <h2 id="create-survey">Neue Befragung</h2>
+          <form onSubmit={create} className={styles.stack}>
+            <div className={styles.field}>
+              <label htmlFor="survey-institution">Hochschule</label>
+              <select id="survey-institution" required value={institutionId} onChange={event => { setInstitutionId(event.target.value); setProgramId(""); }} disabled={busy}>
+                <option value="">Bitte auswählen</option>
+                {data.institutions.map(i => <option key={i.id} value={i.id}>{institutionLabel(i)}</option>)}
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="survey-program">Studiengang</label>
+              <select id="survey-program" required value={programId} onChange={event => setProgramId(event.target.value)} disabled={busy || !institutionId}>
+                <option value="">Bitte auswählen</option>
+                {programs.map(p => <option key={p.id} value={p.id}>{p.name}{p.faculty ? ` · ${p.faculty}` : ""}</option>)}
+              </select>
+            </div>
+            {institutionId && !programs.length && <p>Für diesen Betreiber sind keine Studiengänge verfügbar.</p>}
+            {!data.institutions.length && <p>Keine konfigurierte Hochschule gefunden. Bitte die Betreiberkonfiguration prüfen.</p>}
+            <label>Name der Befragung<input required maxLength={200} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></label>
+            <button type="submit" disabled={busy || !programId || !name.trim()}>Als Entwurf anlegen</button>
+          </form>
+        </section>
+      </div>
     </>}
   </div>;
 }

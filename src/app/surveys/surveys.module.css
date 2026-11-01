@@ -21,3 +21,27 @@
 .context dt { font-weight: 600; }
 .context dd { margin: 0; }
 @media (max-width: 30rem) { .context { grid-template-columns: 1fr; gap: .25rem; } .context dd { margin-bottom: .75rem; } }
+.previewEntry { gap: 1.5rem; }
+.previewHeading h1 { margin-bottom: 0; }
+.previewIntro { border-top: 4px solid #b32338; background: #fff8f6; }
+.previewIntro h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: .75rem; }
+.previewIntro > p:last-child { margin-bottom: 0; font-size: 1.125rem; }
+.previewProgram { margin: 0 0 1rem; color: #912034; font-weight: 700; }
+.previewNotice { margin: 0; padding: .875rem 1rem; border-left: 3px solid #146d86; background: #eef6f8; border-radius: 4px; }
+.previewSteps { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1rem 0 0; }
+.previewSteps li { align-items: flex-start; gap: .75rem; padding: 1rem; background: #fff; }
+.previewSteps .stepNumber { display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: #f8e9ec; color: #912034; }
+.previewSteps h3 { margin: .25rem 0 .5rem; }
+.previewSteps p { margin: 0; color: #484848; }
+.previewStudy > :is(h2, p) { margin: 0; }
+.previewExample { padding: 1rem; border: 1px dashed #999; border-radius: 4px; background: #fafafa; }
+.previewExample h3 { margin-block: .5rem; }
+.previewExample > p:last-child { margin-bottom: 0; }
+.previewDetails summary { cursor: pointer; font-weight: 600; min-height: 44px; align-content: center; }
+.previewDetails summary:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.previewDetails dl { margin-bottom: 0; }
+@media (max-width: 44rem) { .previewSteps { grid-template-columns: 1fr; } }
+.manualFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; }
+.manualReview { display: grid; gap: 1rem; padding-left: 1.5rem; }
+.manualReview h3 { margin-bottom: .5rem; }
+.manualReview p { margin-block: .25rem; }
