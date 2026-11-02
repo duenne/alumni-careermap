@@ -214,10 +214,10 @@ describe("Transactional Alumni profile deletion", () => {
     await expectDeleted();
   });
 
-  it("preserves all existing schema definitions, constraints and the five migrations", async () => {
+  it("preserves all existing schema definitions, constraints and the six migrations", async () => {
     await completeProfile();
     const before = await schemaSnapshot();
-    expect(before.migrations).toHaveLength(5);
+    expect(before.migrations).toHaveLength(6);
     expect(before.triggers).toEqual([]);
     await deleteAlumniProfile(client, alumniId);
     expect(await schemaSnapshot()).toEqual(before);

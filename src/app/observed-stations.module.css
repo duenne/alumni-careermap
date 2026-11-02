@@ -1,6 +1,6 @@
 .stationList { list-style: none; display: grid; gap: 1rem; padding: 0; margin: 0; }
 .stationList > li { min-width: 0; }
-.station { height: 100%; padding: 1.25rem; border: 1px solid #dcdcdc; border-radius: 6px; background: #fff; }
+.station { height: 100%; padding: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
 .stationTop { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 1rem; }
 .category { font-size: 0.875rem; color: var(--muted); }
 .pending { font-size: 0.8125rem; font-weight: 700; background: #f9efdb; color: #69501b; padding: 0.2rem 0.5rem; border-radius: 3px; }
@@ -10,7 +10,7 @@
 .dates dt { color: var(--muted); font-size: 0.8125rem; }
 .dates dd { margin: 0.25rem 0 0; font-size: 0.9375rem; }
 .imprecise { display: block; color: var(--muted); font-size: 0.8125rem; }
-.empty { padding-block: 1.5rem; border-block: 1px solid #dedede; }
+.empty { padding-block: 1.5rem; border-block: 1px solid var(--border); }
 .compact .station { padding: 1rem; }
 .compact .stationTop { display: grid; justify-items: start; justify-content: start; gap: 0.5rem; }
 .compact .station h3 { font-size: 1rem; min-height: 2.5rem; }

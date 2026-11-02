@@ -7,7 +7,7 @@
 .list li::after { position: absolute; content: ""; left: 11.35rem; top: 1rem; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: #477c7c; box-shadow: 0 0 0 4px #eaf2f1; }
 .period { padding-top: 0.75rem; color: #43535b; font-size: 0.9rem; font-weight: 600; }
 .period span { display: block; margin-top: 0.4rem; color: #68747b; font-size: 0.8rem; font-weight: 400; }
-.card { min-width: 0; padding: 1.25rem; border: 1px solid #d6e1e1; border-radius: 0.6rem; background: #fff; overflow-wrap: anywhere; }
+.card { min-width: 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; overflow-wrap: anywhere; }
 .card h3 { margin: 0.75rem 0 0.4rem; font-size: 1.15rem; }
 .card p { margin-block: 0.35rem; }
 .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; }

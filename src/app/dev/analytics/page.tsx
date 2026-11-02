@@ -13,6 +13,6 @@ export default async function AnalyticsPage() {
     const { client, url } = analyticsClient();
     data = await readAnalytics(client, url);
   } catch { /* Do not expose driver errors or configuration to the browser. */ }
-  if (!data) return <main id="main-content"><h1>Synthetische Karriereanalyse</h1><p role="alert">Analytics-Demo nicht verfügbar. Lokale Datenbank und Einrichtung prüfen.</p></main>;
+  if (!data) return <main id="inhalt" tabIndex={-1}><h1>Synthetische Karriereanalyse</h1><p role="alert">Analytics-Demo nicht verfügbar. Lokale Datenbank und Einrichtung prüfen.</p></main>;
   return <Dashboard profiles={data.profiles} />;
 }

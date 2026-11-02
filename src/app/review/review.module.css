@@ -1,9 +1,9 @@
 .back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 0.75rem; }
-.intro { max-width: 46rem; margin-bottom: 1.5rem; }
+.intro { max-width: none; margin-bottom: 1.5rem; padding: clamp(1.25rem, 3vw, 2rem); background: var(--accent-soft); border: 1px solid #efdddd; border-radius: var(--radius); }
 .intro .notice { display: inline-block; border-left: 3px solid var(--accent); padding-left: 0.75rem; font-weight: 700; margin: 0; }
 .closing { margin-block: 1.5rem 0; font-size: 0.875rem; color: var(--muted); }
-.reference { border-top: 1px solid #dedede; margin-top: 1rem; padding-top: 0.75rem; }
-.survey { border-block: 1px solid #dedede; padding-block: 1rem; }
+.reference { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 0.75rem; }
+.survey { border-block: 1px solid var(--border); padding-block: 1rem; }
 .survey h2 { margin-block: 0.5rem 0.75rem; }
 .contextDetails { display: grid; gap: 0.5rem; margin-block: 0.75rem; }
 .contextDetails dt { font-size: 0.875rem; color: var(--muted); }

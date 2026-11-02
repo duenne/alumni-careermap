@@ -96,6 +96,11 @@ model Survey {
   name               String
   referenceProgramId String       @db.Uuid
   status             SurveyStatus @default(DRAFT)
+  entryHeading       String?
+  entryIntro         String?
+  entryWelcome       String?
+  entryPurpose       String?
+  entryContact       String?
 
   referenceProgram Program          @relation(fields: [referenceProgramId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   responses        SurveyResponse[]

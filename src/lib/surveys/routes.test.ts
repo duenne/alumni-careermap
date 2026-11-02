@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-vi.mock("./service", async importOriginal => ({ ...await importOriginal<typeof import("./service")>(), createSurvey: vi.fn(), changeSurveyStatus: vi.fn(), listSurveyAdministration: vi.fn(), readSurveyInvitation: vi.fn() }));
+vi.mock("./service", async importOriginal => ({ ...await importOriginal<typeof import("./service")>(), editSurvey: vi.fn(), createSurvey: vi.fn(), changeSurveyStatus: vi.fn(), listSurveyAdministration: vi.fn(), readSurveyInvitation: vi.fn() }));
 import { createSurveyHandlers } from "./routes";
-import { createSurvey, readSurveyInvitation } from "./service";
+import { createSurvey, editSurvey, SurveyEditConflictError, readSurveyInvitation } from "./service";
 import type { PrismaClient } from "../../generated/prisma/client";
 
 const token = "synthetic-admin-token-at-least-32-characters";
@@ -32,7 +32,7 @@ it("bounds and strictly validates bodies including attempted reference changes",
   }
   expect((await app.POST(request("POST", { action: "program-create", institutionId: id, name: " ", faculty: null }))).status).toBe(400);
   expect((await app.POST(request("POST", { action: "program-create", institutionId: id, name: "Synthetic", faculty: null, status: "OPEN" }))).status).toBe(400);
-  expect((await app.POST(request("POST", "x".repeat(5000)))).status).toBe(413);
+  expect((await app.POST(request("POST", "x".repeat(32769)))).status).toBe(413);
   expect(client).not.toHaveBeenCalled();
 });
 it("creates with trusted scope and never echoes internal errors", async () => {
@@ -51,9 +51,22 @@ it("returns only invitation context without credentials, and handles unavailable
   vi.mocked(readSurveyInvitation).mockResolvedValue(null);
   expect((await app.invitation(req, id)).status).toBe(404);
   expect((await app.invitation(req, "invalid")).status).toBe(404);
-  const context = { id, name: "Synthetic", status: "OPEN", referenceProgram: { id, name: "Synthetic program", faculty: null, institution: { id, name: "Synthetic institute" } } } as const;
+  const context = { id, name: "Synthetic", status: "OPEN", entryHeading: null, entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null, referenceProgram: { id, name: "Synthetic program", faculty: null, institution: { id, name: "Synthetic institute" } } } as const;
   vi.mocked(readSurveyInvitation).mockResolvedValue(context);
   const response = await app.invitation(req, id);
   expect(await response.json()).toEqual(context);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
+});
+
+it("authorizes edits, rejects protected-field injection, and reports stale revisions", async () => {
+  const client = vi.fn(async () => ({} as PrismaClient)); const app = createSurveyHandlers({ client });
+  const body = { action: "edit", surveyId: id, expectedUpdatedAt: "2026-11-02T10:00:00.000Z", name: "Synthetic", entryHeading: "Synthetic heading", entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null };
+  expect((await app.POST(request("POST", body, { authorization: "" }))).status).toBe(401);
+  expect((await app.POST(request("POST", { ...body, status: "OPEN" }))).status).toBe(400);
+  expect(client).not.toHaveBeenCalled();
+  vi.mocked(editSurvey).mockResolvedValue({ id } as Awaited<ReturnType<typeof editSurvey>>);
+  expect((await app.POST(request("POST", body))).status).toBe(200);
+  vi.mocked(editSurvey).mockRejectedValue(new SurveyEditConflictError());
+  const conflict = await app.POST(request("POST", body));
+  expect(conflict.status).toBe(409); expect(await conflict.json()).toEqual({ code: "EDIT_CONFLICT" });
 });

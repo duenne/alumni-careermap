@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, afterEach, beforeEach, expect, it } from "vitest";
 import { PrismaClient } from "../../src/generated/prisma/client";
-import { createSurvey, changeSurveyStatus, listSurveyAdministration, readSurveyInvitation } from "../../src/lib/surveys/service";
+import { createSurvey, editSurvey, SurveyEditConflictError, changeSurveyStatus, listSurveyAdministration, readSurveyInvitation } from "../../src/lib/surveys/service";
 import type { SurveyResponseServiceConfiguration } from "../../src/lib/operator-scope";
 import { createCatalogProgram } from "../../src/lib/surveys/catalog";
 
@@ -44,9 +44,38 @@ it("creates DRAFT, opens, closes and reopens without changing its reference or c
     expect(await changeSurveyStatus(client, { surveyId: survey.id, status }, config)).toMatchObject({ status, referenceProgramId: programId });
     const invitation = await readSurveyInvitation(client, survey.id, config);
     expect(invitation).toMatchObject({ id: survey.id, status, referenceProgram: { id: programId, name: "Synthetic V3 Program", faculty: "Synthetic Faculty", institution: { name: "Synthetic V3 Institute" } } });
-    expect(Object.keys(invitation!).sort()).toEqual(["id", "name", "referenceProgram", "status"]);
+    expect(Object.keys(invitation!).sort()).toEqual(["entryContact", "entryHeading", "entryIntro", "entryPurpose", "entryWelcome", "id", "name", "referenceProgram", "status"]);
   }
   expect(await client.surveyResponse.count({ where: { surveyId: survey.id } })).toBe(0);
+});
+
+it("persists editorial content for exactly one survey, rejects stale edits and preserves participation invariants", async () => {
+  const first = await createSurvey(client, { name: "Synthetic first", referenceProgramId: programId }, config);
+  const second = await createSurvey(client, { name: "Synthetic second", referenceProgramId: programId }, config);
+  const input = { surveyId: first.id, expectedUpdatedAt: first.updatedAt.toISOString(), name: "Synthetic renamed", entryHeading: " Synthetic Cafe\u0301 ", entryIntro: null, entryWelcome: "Synthetic welcome\n\nSecond paragraph", entryPurpose: "Synthetic purpose", entryContact: "Synthetic operator" };
+  const saved = await editSurvey(client, input, config);
+  expect(saved).toMatchObject({ name: "Synthetic renamed", status: "DRAFT", referenceProgram: { id: programId }, entryHeading: "Synthetic Café", entryIntro: null });
+  expect(saved.updatedAt.getTime()).toBeGreaterThan(first.updatedAt.getTime());
+  await expect(editSurvey(client, { ...input, name: "Stale overwrite" }, config)).rejects.toBeInstanceOf(SurveyEditConflictError);
+  expect(await client.survey.findUnique({ where: { id: second.id } })).toMatchObject({ name: second.name, entryWelcome: null });
+  await changeSurveyStatus(client, { surveyId: first.id, status: "OPEN" }, config);
+  expect(await readSurveyInvitation(client, first.id, config)).toMatchObject({ entryHeading: "Synthetic Café", entryWelcome: input.entryWelcome });
+  const latest = await client.survey.findUniqueOrThrow({ where: { id: first.id } });
+  const cleared = await editSurvey(client, { ...input, expectedUpdatedAt: latest.updatedAt.toISOString(), entryHeading: " " }, config);
+  expect(cleared).toMatchObject({ entryHeading: null, status: "OPEN" });
+  expect(await client.surveyResponse.count({ where: { surveyId: first.id } })).toBe(0);
+});
+
+it("refuses foreign and faculty-mismatched edits and protects text constraints in SQL", async () => {
+  const foreign = await client.survey.create({ data: { name: "Synthetic foreign", referenceProgramId: otherProgramId } });
+  const local = await createSurvey(client, { name: "Synthetic local", referenceProgramId: programId }, config);
+  const input = { surveyId: foreign.id, expectedUpdatedAt: foreign.updatedAt.toISOString(), name: "Synthetic edit", entryHeading: null, entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null };
+  await expect(editSurvey(client, input, config)).rejects.toThrow();
+  await expect(editSurvey(client, { ...input, surveyId: local.id, expectedUpdatedAt: local.updatedAt.toISOString() }, { operatorScope: { kind: "FACULTY", institutionId, faculty: "Other faculty" } })).rejects.toThrow();
+  for (const entryHeading of [" ", "x".repeat(161)]) {
+    await expect(client.$executeRaw`UPDATE "Survey" SET "entryHeading" = ${entryHeading} WHERE "id" = ${local.id}::uuid`).rejects.toThrow();
+  }
+  expect(await client.survey.findUnique({ where: { id: local.id } })).toMatchObject({ name: "Synthetic local", entryHeading: null });
 });
 it("rejects status/program injection, blank names and invalid IDs without inserting a survey", async () => {
   for (const input of [{ name: "  ", referenceProgramId: programId }, { name: "Synthetic", referenceProgramId: "invalid" }, { name: "Synthetic", referenceProgramId: programId, status: "OPEN" }]) {

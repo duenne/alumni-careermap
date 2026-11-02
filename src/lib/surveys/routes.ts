@@ -5,9 +5,11 @@ import { createSurvey, changeSurveyStatus, InvalidSurveyInputError, isSurveyId, 
 import { SurveyOutsideOperatorScopeError } from "../survey-response-service";
 import { SurveyNotFoundError } from "../survey-service";
 import { CatalogOutsideOperatorScopeError, createCatalogProgram, parseCatalogProgram } from "./catalog";
+import { editSurvey, parseSurveyEdit, SurveyEditConflictError } from "./service";
 
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers: surveyHeaders });
 function failure(error: unknown) {
+  if (error instanceof SurveyEditConflictError) return json({ code: "EDIT_CONFLICT" }, 409);
   if (error && typeof error === "object" && "code" in error && error.code === "P2002") return json({ code: "ALREADY_EXISTS" }, 409);
   if (error instanceof InvalidSurveyInputError || error instanceof SyntaxError) return json({ code: "INVALID_REQUEST" }, 400);
   if (error instanceof SurveyOutsideOperatorScopeError || error instanceof SurveyNotFoundError || error instanceof CatalogOutsideOperatorScopeError) return json({ code: "NOT_FOUND" }, 404);
@@ -34,13 +36,17 @@ export function createSurveyHandlers(deps: { client: () => Promise<PrismaClient>
           for (;;) {
             const chunk = await reader.read(); if (chunk.done) break;
             size += chunk.value.length;
-            if (size > 4096) { await reader.cancel(); return json({ code: "TOO_LARGE" }, 413); }
+            if (size > 32768) { await reader.cancel(); return json({ code: "TOO_LARGE" }, 413); }
             chunks.push(chunk.value);
           }
         } finally { reader.releaseLock(); }
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         if (!body || typeof body !== "object" || Array.isArray(body)) throw new InvalidSurveyInputError();
         const { action, ...input } = body;
+        if (action === "edit") {
+          const parsed = parseSurveyEdit(input);
+          return json(await editSurvey(await deps.client(), parsed, surveyConfiguration()));
+        }
         if (action === "program-create") {
           const parsed = parseCatalogProgram(input);
           return json(await createCatalogProgram(await deps.client(), parsed, surveyConfiguration()), 201);

@@ -33,9 +33,11 @@ async function review(host: HTMLElement) {
 it("offers manual entry with no invented degree type, requires an explicit own degree, and saves only after both confirmations", async () => {
   const fetch = vi.fn<(url: string, options?: RequestInit) => Promise<Response>>(async () => Response.json({ saved: true, receipt: { degrees: 1, careerSteps: 0, timelineItems: 1 } })); vi.stubGlobal("fetch", fetch);
   const host = await mount();
+  expect(host.querySelector('nav[aria-label="Deine Teilnahme"] [aria-current="step"]')?.textContent).toContain("Werdegang erfassen");
   expect(field(host, "Abschlussart").value).toBe("");
   await review(host);
   expect(host.textContent).toContain("Deine Angaben prüfen");
+  expect(host.querySelector('nav[aria-label="Deine Teilnahme"] [aria-current="step"]')?.textContent).toContain("Angaben prüfen");
   const submit = button(host, "Verbindlich absenden"); expect(submit.disabled).toBe(true);
   await act(async () => host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0].click());
   expect(submit.disabled).toBe(true); expect(fetch).not.toHaveBeenCalled();
@@ -45,6 +47,7 @@ it("offers manual entry with no invented degree type, requires an explicit own d
   expect(fetch).toHaveBeenCalledOnce();
   expect(fetch.mock.calls[0][0]).toBe(`/api/surveys/${id}/participation`);
   expect(host.textContent).toContain("Dein Karriereweg wurde gespeichert");
+  expect(host.querySelector('nav[aria-label="Deine Teilnahme"] [aria-current="step"]')?.textContent).toContain("Abgeschlossen");
   expect(host.querySelectorAll("input,form")).toHaveLength(0);
 });
 it("allows editing, clears confirmations on changes, retains data on failure and permits the same contribution to be retried", async () => {

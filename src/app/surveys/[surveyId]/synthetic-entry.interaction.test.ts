@@ -17,7 +17,7 @@ import { manualParticipationEnabled } from "../../../lib/donation/manual-access"
 
 const surveyId = "00000000-0000-4000-8000-000000000001";
 const context: SurveyContext = {
-  id: surveyId, name: "SYNTHETISCH / DEMO – Master Informatik", status: "OPEN",
+  id: surveyId, name: "SYNTHETISCH / DEMO – Master Informatik", status: "OPEN", entryHeading: null, entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null,
   referenceProgram: { id: surveyId, name: "Master Informatik", faculty: "Synthetische Fakultät", institution: { id: surveyId, name: "Synthetische Hochschule" } },
 };
 let root: Root | undefined;
@@ -44,7 +44,7 @@ const page = (id = surveyId) => SurveyEntryPage({ params: Promise.resolve({ surv
 it("leads with the benefit and three planned steps, with actual survey details in a closed disclosure", async () => {
   const host = await mount(await page());
   expect(host.querySelector("h1")?.textContent).toBe("Dein Weg nach dem Studium");
-  expect(host.querySelector("h2")?.textContent).toBe("Wo hat dich dein Studium hingeführt?");
+  expect(host.textContent).toContain("Wo hat dich dein Studium hingeführt?");
   expect(host.textContent).toContain("Deine Erfahrungen könnten später helfen, diese Wege sichtbar zu machen.");
   expect(host.textContent).toContain("Dein eigener Abschluss im ausgewählten Studiengang ist der Ausgangspunkt für die Auswertung deines Karrierewegs.");
   const steps = [...host.querySelectorAll('ol[aria-label="Geplanter Ablauf"] li')];
@@ -96,7 +96,7 @@ it.each(["0", "1"])("keeps closed surveys closed with no preview or participatio
 it("preserves the regular development participation entry and session warning", async () => {
   vi.stubEnv("CAREERMAP_DEV_DONATION", "1"); vi.stubEnv("CAREERMAP_SYNTHETIC_DONATION", "1");
   const host = await mount(await SurveyEntryPage({ params: Promise.resolve({ surveyId }), searchParams: Promise.resolve({ session: "missing" }) }));
-  expect(host.querySelector("h1")?.textContent).toBe(context.name);
+  expect(host.querySelector("h1")?.textContent).toBe("Dein Weg nach dem Studium");
   expect(host.textContent).toContain("Deine Teilnahmesitzung ist hier nicht mehr verfügbar.");
   expect([...host.querySelectorAll("button")].map(button => button.textContent)).toEqual(["Mit LinkedIn-Datenspende beginnen", "Mit synthetischem Testprofil beginnen"]);
   expect(host.textContent).not.toContain("Fiktives Beispiel ansehen");
@@ -121,4 +121,16 @@ it("keeps access and invalid/unknown survey guards ahead of rendering", async ()
   expect(surveyClient).not.toHaveBeenCalled();
   vi.mocked(readSurveyInvitation).mockResolvedValue(null);
   await expect(page()).rejects.toThrow("NOT_FOUND");
+});
+
+it.each(["0", "1"])("renders saved survey text as plain text while retaining system notices (donation %s)", async enabled => {
+  vi.stubEnv("CAREERMAP_DEV_DONATION", enabled); vi.stubEnv("CAREERMAP_SYNTHETIC_DONATION", "1");
+  vi.mocked(readSurveyInvitation).mockResolvedValue({ ...context, entryHeading: "Synthetic custom heading", entryIntro: "Synthetic introduction", entryWelcome: "Synthetic <script>example</script>\n\nWelcome", entryPurpose: "Synthetic purpose", entryContact: "Synthetic operator" });
+  const host = await mount(await page());
+  expect(host.querySelector("h1")?.textContent).toBe("Synthetic custom heading");
+  expect(host.textContent).toContain("Synthetic <script>example</script>");
+  expect(host.textContent).toContain("Synthetic purpose");
+  expect(host.textContent).toContain("Synthetic operator");
+  expect(host.querySelector("script")).toBeNull();
+  expect(host.textContent).toContain(enabled === "1" ? "Individuelle Karriereprofile werden nicht öffentlich zugänglich gemacht." : "keine Teilnahme oder Karriereprofile gespeichert");
 });

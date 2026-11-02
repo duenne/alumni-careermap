@@ -5,10 +5,12 @@ import { surveyAccess } from "../lib/surveys/access";
 
 export function JourneyHomeContent() {
   return <main id="inhalt" tabIndex={-1} className="entry">
+    <header className="pageHero">
     <p className="eyebrow">Studiengangsbezogene Alumni-Befragungen</p>
     <h1>Alumni CareerMap</h1>
     <p className="lead">Von der Einladung bis zum gemeinsamen Einblick: Alumni prüfen ihren Karriereweg und bestätigen ihren Beitrag. Der Betreiber wertet die bestätigten Antworten für genau diese Befragung aus.</p>
-    <section aria-labelledby="operator-start">
+    </header>
+    <section className="plannedProcess" aria-labelledby="operator-start">
       <h2 id="operator-start">Befragung einrichten</h2>
       <p>Als Betreiber wählst du einen bestehenden Studiengang, öffnest die Befragung und teilst ihren Einladungslink. Verwaltung und Auswertung sind zugangsgeschützt.</p>
       <Link href="/admin/surveys" className="primaryLink">Befragungen verwalten</Link>

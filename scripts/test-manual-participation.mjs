@@ -93,6 +93,9 @@ try {
     await page.screenshot({ path: join(artifacts, `${width}-invitation.png`), fullPage: true });
     await page.getByRole("button", { name: "Selbst eintragen", exact: true }).click();
     await expect(page).toHaveURL(`${origin}/surveys/${ids.open}/participation`);
+    const progress = page.getByRole("navigation", { name: "Deine Teilnahme", exact: true });
+    await expect(progress.locator('[aria-current="step"]')).toContainText("Werdegang erfassen");
+    await page.screenshot({ path: join(artifacts, `${width}-entry-start.png`), fullPage: true });
     const study = page.getByRole("group", { name: "1. Studium", exact: true });
     await expect(study.getByLabel("Abschlussart", { exact: true })).toHaveValue("");
     await study.getByLabel("Bezeichnung des Studiums", { exact: true }).fill(`Synthetischer Master ${width}`);
@@ -112,6 +115,15 @@ try {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: join(artifacts, `${width}-input.png`), fullPage: true });
     await page.getByRole("button", { name: "Angaben prüfen", exact: true }).click();
+    await expect(progress.locator('[aria-current="step"]')).toContainText("Angaben prüfen");
+    await expect(page.getByRole("heading", { name: "Deine Angaben prüfen", exact: true })).toBeFocused();
+    if (width === 375) {
+      await page.setViewportSize({ width: 320, height: 900 });
+      await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+      await page.setViewportSize({ width, height: 900 });
+    }
     const submit = page.getByRole("button", { name: "Verbindlich absenden", exact: true });
     await expect(submit).toBeDisabled(); await expect(page.getByRole("checkbox").nth(0)).not.toBeChecked();
     await page.getByRole("checkbox").nth(0).check(); await expect(submit).toBeDisabled();
@@ -120,6 +132,8 @@ try {
     const sending = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/participation"));
     await submit.click(); const submitted = (await sending).postDataJSON();
     await expect(page.getByRole("heading", { name: "Dein Karriereweg wurde gespeichert", exact: true })).toBeVisible();
+    await expect(progress.locator('[aria-current="step"]')).toContainText("Abgeschlossen");
+    await page.screenshot({ path: join(artifacts, `${width}-complete.png`), fullPage: true });
     await page.reload(); await expect(page.getByRole("heading", { name: "Dein Karriereweg wurde gespeichert", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Verbindlich absenden", exact: true })).toHaveCount(0);
     expect((await context.request.post(`${origin}/api/surveys/${ids.open}/participation`, { data: submitted, headers: { origin } })).status()).toBe(200);
