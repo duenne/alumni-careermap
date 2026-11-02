@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 test("20 profiles from PostgreSQL -> complete timeline -> interactive conserved Sankey", async ({ page }) => {
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await page.goto("/dev/analytics");
+  await page.getByRole("button", { name: "Typische Karrierepfade", exact: true }).click();
   await expect(page.getByRole("heading", { name: "MSI · Karrierepfade erkunden" })).toBeVisible();
   const rows = page.getByRole("region", { name: "Importierte Alumni" }).locator("tbody tr");
   await expect(rows).toHaveCount(20);

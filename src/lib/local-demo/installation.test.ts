@@ -15,6 +15,23 @@ it("activates manual participation only for the recorded independent survey and 
 });
 const bootstrap = { image: `postgres@sha256:${"a".repeat(64)}`, imageId: `sha256:${"b".repeat(64)}`, dockerEndpoint: "unix:///synthetic/docker.sock", composeSha256: "c".repeat(64) };
 const location = () => join(mkdtempSync(join(tmpdir(), "careermap-install-test-")), "v5");
+it("binds synthetic detail access to the recorded seed survey, upgrading older private runtime metadata on save", () => {
+  const root = location(), { installation } = createInstallation(root, bootstrap);
+  const a = "44444444-4444-4444-8444-444444444444";
+  saveInstallation(root, { ...installation, surveyAId: a });
+  expect(readLocalDemoConfiguration(JSON.parse(readFileSync(join(root, "runtime.json"), "utf8")))).toMatchObject({ syntheticSurveyId: a });
+  const legacy = JSON.parse(readFileSync(join(root, "runtime.json"), "utf8"));
+  delete legacy.CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID;
+  writeFileSync(join(root, "runtime.json"), JSON.stringify(legacy));
+  const loaded = loadInstallation(root);
+  expect(readLocalDemoConfiguration(legacy)).not.toHaveProperty("syntheticSurveyId");
+  saveInstallation(root, loaded.installation);
+  expect(readLocalDemoConfiguration(JSON.parse(readFileSync(join(root, "runtime.json"), "utf8")))).toMatchObject({ syntheticSurveyId: a });
+  const forged = JSON.parse(readFileSync(join(root, "runtime.json"), "utf8"));
+  forged.CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID = "55555555-5555-4555-8555-555555555555";
+  writeFileSync(join(root, "runtime.json"), JSON.stringify(forged));
+  expect(() => loadInstallation(root)).toThrow();
+});
 it("loads optional LinkedIn credentials only from a private file after explicit participation activation", () => {
   const root = location(), { installation: i } = createInstallation(root, bootstrap);
   const surveyBId = "55555555-5555-4555-8555-555555555555";

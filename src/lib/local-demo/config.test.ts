@@ -3,6 +3,14 @@ import { localDemoEnvironment } from "../../../tests/support/local-demo";
 import { assertLocalDemoStartArguments, readLocalDemoConfiguration } from "./config";
 
 describe("D1.4b closed production demo configuration", () => {
+  it("validates an optional recorded synthetic survey and never shares its ID with live participation", () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const env = { ...localDemoEnvironment(), CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID: id };
+    expect(readLocalDemoConfiguration(env)).toMatchObject({ syntheticSurveyId: id });
+    expect(readLocalDemoConfiguration(localDemoEnvironment())).not.toHaveProperty("syntheticSurveyId");
+    expect(() => readLocalDemoConfiguration({ ...env, CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID: "invalid" })).toThrow();
+    expect(() => readLocalDemoConfiguration({ ...env, CAREERMAP_LOCAL_DEMO: "v5-participation", CAREERMAP_LOCAL_DEMO_PURPOSE: "LOCAL_PARTICIPATION", CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: id })).toThrow();
+  });
   it("permits explicit private LinkedIn credentials only in participation mode while preserving the registered loopback callback", () => {
     const env = { ...localDemoEnvironment(), CAREERMAP_LOCAL_DEMO: "v5-participation", CAREERMAP_LOCAL_DEMO_PURPOSE: "LOCAL_PARTICIPATION", CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: "44444444-4444-4444-8444-444444444444",
       CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID: "synthetic-client", CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: "synthetic-secret", CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: "http://localhost:3100/auth/linkedin/portability/callback" };

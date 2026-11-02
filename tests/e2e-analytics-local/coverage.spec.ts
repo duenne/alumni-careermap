@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 test("optional local Phase-D acceptance: all 100 profiles and 432 timeline stations", async ({ page }) => {
   const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
   await page.goto("/dev/analytics");
+  await page.getByRole("button", { name: "Typische Karrierepfade", exact: true }).click();
   const rows = page.getByRole("region", { name: "Importierte Alumni" }).locator("tbody tr");
   await expect(rows).toHaveCount(100);
   const unclear = await rows.locator("td:nth-of-type(3)").allTextContents();

@@ -54,6 +54,7 @@ export function runtimeConfiguration(i: Installation, s: InstallationSecrets): R
     ...(i.participationSurveyId ? { CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: i.participationSurveyId } : {}),
     ...(i.linkedInEnabled ? { CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID: s.linkedIn!.clientId, CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET: s.linkedIn!.clientSecret, CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI: s.linkedIn!.redirectUri } : {}),
     CAREERMAP_LOCAL_DEMO_INSTALLATION_ID: i.installationId, CAREERMAP_LOCAL_DEMO_OPERATOR_ID: i.operatorId,
+    ...(i.surveyAId ? { CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID: i.surveyAId } : {}),
     CAREERMAP_LOCAL_DEMO_MSI_PROGRAM_ID: i.pilotProgramId, CAREERMAP_LOCAL_DEMO_OPERATOR_KIND: "INSTITUTION",
     CAREERMAP_LOCAL_DEMO_ORIGIN: `http://127.0.0.1:${i.appPort}`,
     CAREERMAP_LOCAL_DEMO_DATABASE_URL: `postgresql://careermap_v5_demo:${s.databasePassword}@127.0.0.1:${i.dbPort}/careermap_v5_demo`,
@@ -70,7 +71,12 @@ export function loadInstallation(root: string): { installation: Installation; se
     if (installation.linkedInEnabled) typed.linkedIn = readPrivateLinkedIn(root);
     const expected = runtimeConfiguration(installation, typed);
     if (readFileSync(join(root, "admin-password"), "utf8") !== typed.adminDatabasePassword) return fail();
-    if (JSON.stringify(JSON.parse(readFileSync(join(root, "runtime.json"), "utf8"))) !== JSON.stringify(expected)) return fail();
+    const runtime = JSON.parse(readFileSync(join(root, "runtime.json"), "utf8"));
+    // Older installations did not expose their recorded seed Survey ID to the
+    // app. Absence keeps details redacted until the next normal save/build.
+    // A present but different ID is never accepted or silently overwritten.
+    if (!Object.hasOwn(runtime, "CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID")) delete expected.CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID;
+    if (JSON.stringify(runtime) !== JSON.stringify(expected)) return fail();
     readLocalDemoConfiguration(expected);
     return { installation, secrets: typed };
   } catch (error) { if (error instanceof InstallationError) throw error; return fail(); }

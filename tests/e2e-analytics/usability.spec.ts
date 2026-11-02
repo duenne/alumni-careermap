@@ -3,6 +3,7 @@ test("four responsive stages, filters, full-path highlighting and short keyboard
   let analyticsRequests = 0;
   page.on("request", request => { if (new URL(request.url()).pathname === "/dev/analytics") analyticsRequests++; });
   await page.goto("/dev/analytics");
+  await page.getByRole("button", { name: "Typische Karrierepfade", exact: true }).click();
   const initialRequests = analyticsRequests;
   const chart = page.getByRole("region", { name: "MSI-Sankey", exact: true });
   await expect(chart.getByRole("button", { name: "Typische Karrierepfade", exact: true })).toHaveAttribute("aria-pressed", "true");

@@ -6,6 +6,7 @@ export type DemoEnvironment = Record<string, string | undefined>;
 export type LocalDemoConfiguration = {
   mode: "v5-synthetic" | "v5-participation"; installationId: string; origin: string; databaseUrl: string;
   participationSurveyId?: string;
+  syntheticSurveyId?: string;
   linkedIn?: LinkedInConfig;
   pilotProgramId: string; operatorScope: OperatorScope; administratorPassword: string;
 };
@@ -14,7 +15,7 @@ export const localDemoInstitutionName = (id: string) => `SYNTHETISCH / DEMO – 
 export const localLinkedInRuntimeKeys = ["CAREERMAP_LOCAL_LINKEDIN_CLIENT_ID", "CAREERMAP_LOCAL_LINKEDIN_CLIENT_SECRET", "CAREERMAP_LOCAL_LINKEDIN_REDIRECT_URI"] as const;
 export const demoRuntimeKeys = ["NODE_ENV", "CAREERMAP_LOCAL_DEMO", "CAREERMAP_LOCAL_DEMO_PURPOSE", "CAREERMAP_LOCAL_DEMO_INSTALLATION_ID",
   "CAREERMAP_LOCAL_DEMO_ORIGIN", "CAREERMAP_LOCAL_DEMO_DATABASE_URL", "CAREERMAP_LOCAL_DEMO_OPERATOR_ID", "CAREERMAP_LOCAL_DEMO_MSI_PROGRAM_ID",
-  "CAREERMAP_LOCAL_DEMO_OPERATOR_KIND", "CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY", "CAREERMAP_SURVEY_ADMIN_TOKEN", "CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID", ...localLinkedInRuntimeKeys] as const;
+  "CAREERMAP_LOCAL_DEMO_OPERATOR_KIND", "CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY", "CAREERMAP_SURVEY_ADMIN_TOKEN", "CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID", "CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID", ...localLinkedInRuntimeKeys] as const;
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export class LocalDemoConfigurationError extends Error {
   constructor() { super("INVALID_LOCAL_DEMO_CONFIGURATION"); this.name = "LocalDemoConfigurationError"; }
@@ -38,6 +39,8 @@ export function readLocalDemoConfiguration(env: DemoEnvironment = process.env): 
       || env.CAREERMAP_LOCAL_DEMO_PURPOSE !== (participation ? "LOCAL_PARTICIPATION" : "SYNTHETIC_DEMO_ONLY")) throw new Error();
     const participationSurveyId = env.CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID;
     if (participation ? !uuid(participationSurveyId) : participationSurveyId !== undefined) throw new Error();
+    const syntheticSurveyId = env.CAREERMAP_LOCAL_DEMO_SYNTHETIC_SURVEY_ID;
+    if (syntheticSurveyId !== undefined && (!uuid(syntheticSurveyId) || syntheticSurveyId.toLowerCase() === participationSurveyId?.toLowerCase())) throw new Error();
     let linkedIn: LinkedInConfig | undefined;
     if (localLinkedInRuntimeKeys.some(key => env[key] !== undefined)) {
       if (!participation || localLinkedInRuntimeKeys.some(key => !env[key]?.trim())) throw new Error();
@@ -70,7 +73,7 @@ export function readLocalDemoConfiguration(env: DemoEnvironment = process.env): 
     if (kind !== "FACULTY" && env.CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY !== undefined) throw new Error();
     const operatorScope = validateOperatorScope({ kind, institutionId: env.CAREERMAP_LOCAL_DEMO_OPERATOR_ID,
       ...(kind === "FACULTY" ? { faculty: env.CAREERMAP_LOCAL_DEMO_OPERATOR_FACULTY } : {}) });
-    return { mode: participation ? "v5-participation" : "v5-synthetic", ...(participation ? { participationSurveyId: participationSurveyId!.toLowerCase() } : {}), installationId: installationId.toLowerCase(), pilotProgramId: pilotProgramId.toLowerCase(), origin,
+    return { mode: participation ? "v5-participation" : "v5-synthetic", ...(participation ? { participationSurveyId: participationSurveyId!.toLowerCase() } : {}), ...(syntheticSurveyId ? { syntheticSurveyId: syntheticSurveyId.toLowerCase() } : {}), installationId: installationId.toLowerCase(), pilotProgramId: pilotProgramId.toLowerCase(), origin,
       databaseUrl, administratorPassword, operatorScope, ...(linkedIn ? { linkedIn } : {}) };
   } catch { throw new LocalDemoConfigurationError(); }
 }

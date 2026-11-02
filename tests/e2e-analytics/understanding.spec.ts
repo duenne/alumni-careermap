@@ -1,0 +1,32 @@
+import { test, expect } from "@playwright/test";
+
+test("understands actual station sequences and opens concrete careers from groups and diagram categories", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/dev/analytics");
+  const chart = page.getByRole("region", { name: "MSI-Sankey", exact: true });
+  await expect(chart.getByRole("button", { name: "Karrierewege verstehen", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(chart.getByRole("region", { name: "Was die Karrierewege zeigen" })).toContainText("80 erfasste Stationen");
+  await expect(chart.locator('[data-node-state="unknown"]')).toHaveCount(0);
+  await expect(chart.locator("[data-stage-heading]")).toHaveCount(4);
+  await chart.locator("[data-career-group]").first().click();
+  await expect(chart.getByRole("region", { name: "Wege im gewählten Verlauf" })).toContainText("20 Wege");
+  await chart.locator("[data-open-career]").first().click();
+  const career = chart.getByRole("region", { name: "Stationen des ausgewählten Karrierewegs" });
+  await expect(career.locator("li")).toHaveCount(4);
+  await expect(career).toContainText("Synthetic role");
+  await expect(career).toContainText("Synthetic training");
+  await expect(career).toContainText("Auslandssemester Social Innovation");
+  await expect(chart.locator('[data-selected-profile="true"]')).toHaveCount(3);
+  await page.getByLabel("Karrierepfad hervorheben", { exact: true }).selectOption("");
+  const node = chart.locator('g[data-node-label="Beschäftigung"]');
+  await node.click();
+  const matching = chart.getByRole("region", { name: "Karrierewege in der Auswahl" });
+  await expect(matching).toContainText("20 Wege");
+  await matching.getByRole("button", { name: /^Profil 1 ansehen/ }).click();
+  await expect(career.locator("li")).toHaveCount(4);
+  await career.scrollIntoViewIfNeeded();
+  await career.screenshot({ path: `artifacts/career-understanding/${info.project.name}-selected.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
