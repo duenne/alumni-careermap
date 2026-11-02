@@ -1,9 +1,10 @@
 import { referenceStations, type CareerFlow, type FlowNode, type FlowLink } from "./aggregate";
+import { summarizeCohort } from "./cohort-questions";
 import type { AnalyticsProfile, AnalyticsStation } from "./records";
 
 export const understandingStages = ["Davor erfasst · Stationstypen", "MSI · Referenzstudium", "Danach erfasst · nächste Station", "Zuletzt erfasste Station"];
 const types: Record<string, string> = { BACHELOR: "Weiteres Bachelorstudium", MASTER: "Masterstudium", PHD: "Promotion", DIPLOMA: "Diplomstudium", CERTIFICATE: "Akademisches Zertifikat", OTHER: "Weitere Station", EMPLOYMENT: "Beschäftigung", SELF_EMPLOYMENT: "Selbstständigkeit", INTERNSHIP: "Praktikum", EDUCATION: "Weiterbildung / Austausch", VOCATIONAL_TRAINING: "Berufsausbildung", VOLUNTEERING: "Ehrenamt", UNEMPLOYED: "Ohne Beschäftigung" };
-export const stationType = (s: AnalyticsStation) => types[s.type] ?? s.type;
+export const stationType = (s: Pick<AnalyticsStation, "type">) => types[s.type] ?? s.type;
 export const orderedStations = (p: AnalyticsProfile) => p.stations.toSorted((a, b) => a.position - b.position);
 export const stationPeriod = (s: AnalyticsStation) => ["ONGOING", "IN_PROGRESS"].includes(s.status) ? `Seit ${s.startYear ?? "Beginn offen"}` : `${s.startYear ?? "Beginn offen"} – ${s.endYear ?? "Ende offen"}`;
 export type CareerGroup = { id: string; label: string; alumniIds: string[] };
@@ -67,7 +68,7 @@ export function understandCareers(profiles: AnalyticsProfile[]) {
     }
   }
   flow.nodes = [...nodes.values()].filter(n => usedNodes.has(n.id)); flow.links = [...links.values()]; flow.included = included.length;
-  return { flow, groups: [...groups.values()].sort((a, b) => b.alumniIds.length - a.alumniIds.length || a.label.localeCompare(b.label, "de")), facts: {
+  return { questions: summarizeCohort(included), flow, groups: [...groups.values()].sort((a, b) => b.alumniIds.length - a.alumniIds.length || a.label.localeCompare(b.label, "de")), facts: {
     profiles: included.length, stations: included.reduce((sum, p) => sum + p.stations.length, 0),
     master: included.filter(p => p.stations.some(s => s.kind === "DEGREE" && s.type === "MASTER")).length,
     multipleMasters: included.filter(p => p.stations.filter(s => s.kind === "DEGREE" && s.type === "MASTER").length > 1).length,

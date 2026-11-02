@@ -29,3 +29,20 @@ npm run test:e2e:analytics
 ```
 
 Die Unit-Tests prüfen insbesondere Jahresgrenzen, fehlende Zeiten, fehlende Kategorien, wiederholte Stationen, explizite Referenzen, ungültige Timelines, Profilzählung und gebündelte Bezeichnungen. Die Browsertests verwenden eigenständige synthetische PostgreSQL-Fixtures auf Desktop, Tablet und Mobilgerät und prüfen Auswahl über Stationsfolgen, Diagrammkategorien und vollständige Einzelwege.
+
+## Feinschliff: Fragen vor Detailanalyse
+
+Die Darstellung führt in drei Schritten durch die Daten: **(1) vier gezielte Fragen**, **(2) Karriereverläufe im Sankey**, **(3) konkrete Stationsfolgen und Einzelwege**. Technische Optionen und Methodik folgen danach. Je Frage ist eine kleine Auswertung geöffnet. Zählweisen und Diagrammbedienung sind über beschriftete, per Tastatur und Touch erreichbare Fragezeichen aufklappbar. Wesentliche Einschränkungen, insbesondere fehlende Branchenangaben und die Bedeutung der Reihenfolge, bleiben direkt beim Ergebnis sichtbar.
+
+Der lesende Abgleich der laufenden synthetischen Demobefragung ergibt:
+
+| Frage | Ergebnis aus den 100 gespeicherten Profilen |
+|---|---|
+| Vorerfahrungen | 37 Profile haben Einträge vor dem MSI-Eintrag, 63 keine früheren Einträge. 15 enthalten dort Beschäftigung, 13 Berufsausbildung, 13 Ehrenamt, sieben einen weiteren Bachelor und fünf Selbstständigkeit. Mehrere Typen je Profil sind möglich. Das ist keine Aussage über geografische Herkunft. |
+| Nächster Eintrag hinter MSI | 36 Masterstudium, 27 Beschäftigung, 14 Praktikum, neun Weiterbildung/Austausch, neun Selbstständigkeit, ein Ehrenamt; vier ohne weiteren Eintrag. Diese Position ist kein Nachweis eines Beginns nach dem Abschluss. |
+| Weiterstudium | 50 Profile enthalten danach Masterphasen, zehn davon mehrere. 15 unterschiedliche Masterbezeichnungen sind erfasst. Häufigste Bezeichnung: „M.A. Internationale Entwicklung“ bei sechs von 50 Masterprofilen (12 %). Die Bezeichnungen werden nicht zu vermeintlich gleichen Studiengängen zusammengeführt. |
+| Erster sicher nach MSI begonnener Berufsschritt | Für 95 Profile eindeutig bestimmbar: 85 Beschäftigungen und zehn selbstständige Tätigkeiten, kein Praktikum unter diesen 95 ausgewählten ersten Stationen. Für fünf Profile ist dieser Beginn nicht bestimmbar. Die 14 Praktika als nächste Timeline-Einträge sind damit nicht gleichzusetzen. |
+| Späterer Berufsweg | 95 Profile haben berufliche Stationen hinter dem Referenzeintrag. Als zuletzt erfasste berufliche Rolle ist „Wissenschaftliche:r Mitarbeiter:in“ am häufigsten (acht von 95); beim ersten sicher nach MSI begonnenen Berufsschritt „Product Manager Civic Tech“ (sieben von 95). |
+| Branchen bei Einstieg und späterem Verlauf | Für keine der jeweils 95 ausgewählten beruflichen Stationen ist eine Branche hinterlegt. Eine Branchenverteilung oder dominierende Branche lässt sich deshalb nicht belegen. Arbeitgebernamen und Berufsbezeichnungen werden dafür nicht als Ersatz verwendet. |
+
+Die Prozentangaben beziehen sich je nach Frage ausdrücklich auf alle Profile, Masterprofile oder die ermittelten beruflichen Stationen. Der Wechsel zwischen Berufseinstieg und letzter erfasster beruflicher Station berechnet Branchen und Tätigkeiten aus derselben jeweils ausgewählten Station. Eine später erfasste Branche darf eine fehlende Einstiegsbranche nicht auffüllen.

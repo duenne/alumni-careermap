@@ -30,7 +30,7 @@ export default function Dashboard({ profiles, survey, diagnostics = [], syntheti
     {survey ? <header className={styles.intro}>
       <p className="eyebrow">ALUMNI CAREERMAP · AUSWERTUNG</p>
       <h1>Karrierewege nach Management Sozialer Innovationen</h1>
-      <p>Entdecke, welche Studien- und Berufswege auf MSI folgen und welche Branchen und Tätigkeiten Alumni verbinden.</p>
+      <p>Erkunde die Vorerfahrungen, Studienentscheidungen und beruflichen Stationen in den erfassten Karrierewegen.</p>
       {syntheticDemo && <p className={styles.demoNotice}>Synthetische Demodaten – keine echten Alumni-Befragungen</p>}
       <dl className={styles.stats} aria-label="Überblick">
         <div><dt>{syntheticDemo ? "Antworten in der Demo" : "Gespeicherte Antworten"}</dt><dd>{survey.responses}</dd></div>

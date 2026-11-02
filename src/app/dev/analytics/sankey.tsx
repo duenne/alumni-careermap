@@ -10,7 +10,7 @@ import styles from "./analytics.module.css";
 import { filterMasterProfiles, focusStages, type AnalysisFocus, type MasterFilter } from "../../../lib/analytics/filters";
 
 import { understandCareers, understandingStages } from "../../../lib/analytics/understanding";
-import { CareerGroups, CareerInsights, SelectedCareer } from "./career-understanding";
+import { CareerGroups, CareerInsights, SelectedCareer, QuestionHelp } from "./career-understanding";
 
 const colors = ["#f4c69c", "#b5d6ef", "#c4dfb5", "#d4c1ed", "#f4c69c", "#b5d6ef", "#c4dfb5"];
 const people = (n: number) => `${n} ${n === 1 ? "Person" : "Personen"}`;
@@ -47,7 +47,7 @@ export default function Sankey({ flow: history, profiles, selectedId, onSelect, 
     </div>
     <p>{filtered.removed.length} Profile durch Masterfilter ausgeblendet{master !== "all" ? `, darunter ${filtered.unknown} mit ungeklärtem Masterstatus` : ""}. Der Analyse-Schwerpunkt verändert die Darstellung, nicht die Grundgesamtheit.</p>
   </>;
-  const explanation = <p>{view === "understanding" ? "Lies von links nach rechts: Was ist vor MSI erfasst, welche Station folgt in der gespeicherten Reihenfolge und wo endet der erfasste Weg? Die letzte Station ist nicht zwingend eine heutige Tätigkeit. Zwischenstationen findest du in den Stationsfolgen und im konkreten Karriereweg. Jahresgrenzen oder Überlappungen entfernen keine bekannten Inhalte." : view === "overview" ? "Branche und Jobkategorie gehören zur selben ersten eindeutig nach MSI begonnenen beruflichen Station. Master- und Tätigkeitsstufe beschreiben gemeinsame Profilmerkmale; ein Master muss nicht vor dieser Tätigkeit abgeschlossen worden sein." : "Mehrere Stationen werden zu Kategorienkombinationen zusammengefasst. Eine Verbindung bezeichnet gemeinsame Personenmerkmale und keinen einzelnen tatsächlichen Stationsübergang."}</p>;
+  const explanation = <p>{view === "understanding" ? "Die Spalten zeigen die gespeicherte Reihenfolge. Sie bilden keine lückenlose zeitliche Abfolge ab. Wähle eine Stationsfolge oder ein Profil, um den konkreten Weg zu sehen." : view === "overview" ? "Branche und Jobkategorie gehören zur selben ersten eindeutig nach MSI begonnenen beruflichen Station. Master- und Tätigkeitsstufe beschreiben gemeinsame Profilmerkmale; ein Master muss nicht vor dieser Tätigkeit abgeschlossen worden sein." : "Mehrere Stationen werden zu Kategorienkombinationen zusammengefasst. Eine Verbindung bezeichnet gemeinsame Personenmerkmale und keinen einzelnen tatsächlichen Stationsübergang."}</p>;
   const rules = view === "understanding" ? <>
     <p>Die Übersicht verwendet den bestätigten Referenzabschluss beziehungsweise den deklarierten synthetischen Demoanker und die gespeicherte Stationsreihenfolge. Fehlende Jahresangaben sind kein Ausschlussgrund. „Davor“ und „danach“ bezeichnen hier ausschließlich die Reihenfolge, keine zeitliche Trennung.</p>
     <p>Die erste Spalte bündelt Stationstypen vor dem Referenzeintrag. Die dritte zeigt den nächsten Eintrag. Die letzte zeigt den letzten weiteren Eintrag mit Branche oder Fachrichtung, soweit erfasst. Bei nur einer weiteren Station beschreiben beide Spalten denselben Eintrag. Alle Zwischenstationen bleiben in den vollständigen Stationsfolgen und Einzelwegen erhalten.</p>
@@ -61,23 +61,22 @@ export default function Sankey({ flow: history, profiles, selectedId, onSelect, 
       <ul>{flow.excluded.map((e, i) => <li key={i}>Profil {profiles.findIndex(p => p.id === e.alumniId) + 1}: {e.reason}</li>)}</ul>
   </>;
   return <section aria-label="MSI-Sankey">
+    {view === "understanding" && <CareerInsights data={understanding} />}
+    {!surveyDetails && view !== "understanding" && filters}
+    <h2>{view === "understanding" ? selectedGroup ? `2. Karriereverläufe · ${flow.included} Profile in der gewählten Folge` : "2. Karriereverläufe im Überblick" : view === "overview" ? "Typische Karrierepfade – erste Tätigkeit nach MSI" : "Gesamte Karrierehistorie – Kategorienkombinationen"}</h2>
     <div className={styles.viewSwitch} role="group" aria-label="Sankey-Ansicht">
       <button type="button" aria-pressed={view === "understanding"} onClick={() => setView("understanding")}>Karrierewege verstehen</button>
       <button type="button" aria-pressed={view === "overview"} onClick={() => setView("overview")}>Typische Karrierepfade</button>
       <button type="button" aria-pressed={view === "history"} onClick={() => setView("history")}>Gesamte Karrierehistorie</button>
     </div>
-    {view === "understanding" && <CareerInsights data={understanding} />}
-    {!surveyDetails && view !== "understanding" && filters}
-    <h2>{view === "understanding" ? selectedGroup ? `Karriereverläufe · ${flow.included} Profile in der gewählten Folge` : "Karriereverläufe im Überblick" : view === "overview" ? "Typische Karrierepfade – erste Tätigkeit nach MSI" : "Gesamte Karrierehistorie – Kategorienkombinationen"}</h2>
     {(view === "understanding" || !surveyDetails) && explanation}
     {view === "understanding" && selectedGroup && <button type="button" onClick={() => setGroupId(null)}>Alle Stationsfolgen zeigen</button>}
-    <FlowChart key={`${view}:${view === "understanding" ? selectedGroup?.id ?? "all" : master}`} understanding={view === "understanding"} flow={flow} profiles={profiles} selectedId={selectedId} onSelect={id => { if (view === "understanding" && id && selectedGroup && !selectedGroup.alumniIds.includes(id)) setGroupId(null); onSelect(id); }} stageNames={view === "understanding" ? understandingStages : view === "overview" ? overviewStages : stages} compact={view !== "history"} focusedStages={view === "understanding" ? [0, 1, 2, 3] : focusStages(focus, view)} filteredIds={view === "understanding" ? profiles.filter(p => selectedGroup && !selectedGroup.alumniIds.includes(p.id)).map(p => p.id) : filtered.removed.map(p => p.alumniId)} analysisControls={surveyDetails && view !== "understanding" ? filters : undefined} surveyDetails={surveyDetails ? <>{surveyDetails}{explanation}{rules}</> : undefined} surveyDisclosures={{open: disclosures, onToggle: (key, open) => setDisclosures(previous => previous[key] === open ? previous : {...previous, [key]: open})}} />
-    {view === "understanding" && <CareerGroups groups={understanding.groups} profiles={profiles} selectedGroup={selectedGroup} onGroup={id => { setGroupId(id); onSelect(null); }} onSelect={onSelect} />}
+    <FlowChart careerGroups={view === "understanding" ? <CareerGroups groups={understanding.groups} profiles={profiles} selectedGroup={selectedGroup} onGroup={id => { setGroupId(id); onSelect(null); }} onSelect={onSelect} /> : undefined} key={`${view}:${view === "understanding" ? selectedGroup?.id ?? "all" : master}`} understanding={view === "understanding"} flow={flow} profiles={profiles} selectedId={selectedId} onSelect={id => { if (view === "understanding" && id && selectedGroup && !selectedGroup.alumniIds.includes(id)) setGroupId(null); onSelect(id); }} stageNames={view === "understanding" ? understandingStages : view === "overview" ? overviewStages : stages} compact={view !== "history"} focusedStages={view === "understanding" ? [0, 1, 2, 3] : focusStages(focus, view)} filteredIds={view === "understanding" ? profiles.filter(p => selectedGroup && !selectedGroup.alumniIds.includes(p.id)).map(p => p.id) : filtered.removed.map(p => p.alumniId)} analysisControls={surveyDetails && view !== "understanding" ? filters : undefined} surveyDetails={surveyDetails ? <>{surveyDetails}{explanation}{rules}</> : undefined} surveyDisclosures={{open: disclosures, onToggle: (key, open) => setDisclosures(previous => previous[key] === open ? previous : {...previous, [key]: open})}} />
     {!surveyDetails && <details><summary>Auswertungsregeln und Ausschlüsse</summary>{rules}</details>}
   </section>;
 }
 
-function FlowChart({ flow, profiles, selectedId, onSelect, stageNames, compact, focusedStages, filteredIds, surveyDetails, analysisControls, surveyDisclosures, understanding = false }: Props & { stageNames: string[]; compact: boolean; focusedStages: number[]; filteredIds: string[]; analysisControls?: ReactNode; surveyDisclosures: SurveyDisclosures; understanding?: boolean }) {
+function FlowChart({ flow, profiles, selectedId, onSelect, stageNames, compact, focusedStages, filteredIds, surveyDetails, analysisControls, surveyDisclosures, careerGroups, understanding = false }: Props & { stageNames: string[]; compact: boolean; focusedStages: number[]; filteredIds: string[]; analysisControls?: ReactNode; surveyDisclosures: SurveyDisclosures; careerGroups?: ReactNode; understanding?: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const refs = useRef(new Map<string, SVGGElement>());
   const [width, setWidth] = useState(1200);
@@ -133,7 +132,11 @@ function FlowChart({ flow, profiles, selectedId, onSelect, stageNames, compact, 
     {!surveyDetails && methodology}
     <ul className={styles.legend} aria-label="Farblegende">{(understanding ? [["Davor erfasst", colors[0]], ["MSI", colors[3]], ["Nächste Station", colors[2]], ["Letzte Station", colors[1]], ["Keine Station erfasst", "#eeeeee"]] : [["Fachrichtungen", colors[0]], ["Branchen", colors[1]], ["Jobkategorien", colors[2]], ["BA MSI", colors[3]], ["Nicht vorhanden", "#eeeeee"], ["Unbekannt / ungeklärt", "#f1d981"]]).map(([label, color]) => <li key={label}><span className={styles.swatch} style={{ background: color }} />{label}</li>)}</ul>
     {surveyDetails ? <p id="sankey-keyboard" className={styles.help}>Breitere Bänder bedeuten mehr Profile. Anklicken hebt Wege hervor. Tastatur: Tab, Pfeiltasten, Eingabe; Escape löst die Auswahl.</p> : <>{controls}{keyboardHelp}{status}</>}
-    {understanding && <p className={styles.help}>Die Bänder zählen Profile. Wähle eine Stationsfolge oder ein Profil, um zusammengehörige Wege zu erkennen. Fehlende Kategorien werden durch gespeicherte Bezeichnungen ersetzt, soweit vorhanden. Bei vielen Bezeichnungen bündelt „Weitere Stationen“ die übrigen; die enthaltenen Wege bleiben per Klick erreichbar.</p>}
+    {understanding && <QuestionHelp label="Wie lese und bediene ich das Diagramm?">
+      <p>Die Bänder zählen Profile. Wähle eine Stationsfolge oder ein Profil, um zusammengehörige Wege zu erkennen. Fehlende Kategorien werden durch gespeicherte Bezeichnungen ersetzt, soweit vorhanden. Bei vielen Bezeichnungen bündelt „Weitere Stationen“ die übrigen; die enthaltenen Wege bleiben per Klick erreichbar.</p>
+      <p>Die letzte Station ist nicht zwingend eine heutige Tätigkeit. Bei nur einer Station hinter MSI beziehen sich die dritte und vierte Spalte auf denselben Eintrag. Alle Zwischenstationen findest du im ausgewählten Karriereweg.</p>
+      <p>Tastatur: Ein Tabstopp für die Knoten. Pfeiltasten wechseln, Eingabe fixiert und Escape löst die Auswahl. Alternativ stehen Auswahlfelder in den erweiterten Optionen bereit.</p>
+    </QuestionHelp>}
     {understanding && <div className={styles.controls}>{pathControl}</div>}
     {understanding && profiles.find(p => p.id === selectedId) && <SelectedCareer profile={profiles.find(p => p.id === selectedId)!} number={selectedNumber} />}
     <div ref={container} className={styles.chartMeasure}>
@@ -175,8 +178,9 @@ function FlowChart({ flow, profiles, selectedId, onSelect, stageNames, compact, 
       <div className={styles.controls}>{pinned.ids.slice(0, 6).map(id => <button type="button" key={id} onClick={() => { setPin(null); setHover(null); onSelect(id); }}>Profil {profiles.findIndex(p => p.id === id) + 1} ansehen<span className={styles.careerPreview}>{profiles.find(p => p.id === id)?.stations.toSorted((a, b) => a.position - b.position).at(-1)?.title}</span></button>)}</div>
       {pinned.ids.length > 6 && <label>Alle Wege dieser Auswahl<select aria-label="Alle Wege dieser Auswahl" value="" onChange={e => { if (e.target.value) { setPin(null); setHover(null); onSelect(e.target.value); } }}><option value="">Profil wählen</option>{pinned.ids.map(id => <option key={id} value={id}>Profil {profiles.findIndex(p => p.id === id) + 1} · {profiles.find(p => p.id === id)?.stations.toSorted((a, b) => a.position - b.position).at(-1)?.title}</option>)}</select></label>}
     </section>}
+    {surveyDetails && status}
+    {careerGroups}
     {surveyDetails && <>
-      {status}
       <details className={styles.disclosure} open={surveyDisclosures.open.options} onToggle={e => surveyDisclosures.onToggle("options", e.currentTarget.open)}><summary>Erweiterte Analyseoptionen</summary>{analysisControls}{controls}{keyboardHelp}</details>
       <details className={styles.disclosure} open={surveyDisclosures.open.methodology} onToggle={e => surveyDisclosures.onToggle("methodology", e.currentTarget.open)}><summary>Daten und Auswertungsmethodik</summary>{methodology}{surveyDetails}</details>
     </>}

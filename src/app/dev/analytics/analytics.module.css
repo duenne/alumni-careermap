@@ -56,12 +56,6 @@
 .disclosure[open] > summary { margin-bottom: .75rem; }
 @media (max-width: 40rem) { .controls { align-items: stretch; } .controls label { width: 100%; } }
 .insights { padding: 1rem 1.25rem; background: #f2f6f5; border: 1px solid #cbded9; border-radius: 10px; }
-.insightGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .75rem 1.5rem; }
-.insightGrid > p { margin: .5rem 0; }
-.insightGrid h3 { font-size: 1rem; margin: .5rem 0; }
-.insightGrid ul { padding-left: 1rem; margin: .5rem 0; }
-.insightGrid li { margin-block: .4rem; }
-.insightGrid li strong { white-space: nowrap; }
 .careerGroups > ol, .careerGroups details > ol { padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: .6rem; }
 .careerGroups li { min-width: 0; }
 .careerGroups li button { width: 100%; height: 100%; display: flex; align-items: baseline; gap: .8rem; text-align: left; border-color: #cbd3db; }
@@ -78,10 +72,36 @@
 .selectedCareer li { counter-increment: career-station; }
 .selectedCareer li::before { content: "Station " counter(career-station); font-size: .75rem; font-weight: 700; color: #633c91; }
 .careerPreview { display: block; font-size: .8rem; color: #555; max-width: 24ch; }
-.insightGrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.insightGrid > p { grid-column: span 3; }
-.insightGrid > div { grid-column: span 2; min-width: 0; }
+.quickFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem 1rem; margin-block: .75rem; }
+.quickFacts p { margin: 0; }
+.quickFacts strong, .quickFacts span { display: block; }
+.quickFacts strong { font-size: 1.2rem; color: #3e5260; }
+.quickFacts span { font-size: .85rem; }
+.questionNav { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: 1rem; }
+.questionNav button[aria-pressed=true] { background: #e1ebe8; border-color: #50776a; font-weight: 700; }
+.questionPanel { background: white; border: 1px solid #dbe4e0; border-radius: 6px; padding: 1rem; }
+.questionPanel h3 { margin-top: 0; }
+.questionFigure { margin: .8rem 0; }
+.questionFigure figcaption { font-size: .85rem; color: #555; margin-bottom: .6rem; }
+.questionBars { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .65rem; }
+.questionBars li > div { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; font-size: .85rem; }
+.questionBars li strong { white-space: nowrap; font-size: .8rem; }
+.barTrack { display: block; height: .4rem; margin-top: .25rem; background: #eef1f3; border-radius: 4px; overflow: hidden; }
+.barTrack > span { display: block; height: 100%; background: #859eb2; }
+.contextHelp { margin-block: .75rem .25rem; }
+.contextHelp > summary { list-style: none; display: inline-flex; justify-content: center; align-items: center; width: 44px; height: 44px; border: 1px solid #a7b5bc; border-radius: 50%; background: white; font-weight: 700; color: #3e5260; }
+.contextHelp > summary::-webkit-details-marker { display: none; }
+.contextHelp > summary:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.contextHelp > div { font-size: .85rem; color: #4d565b; padding: .5rem .75rem; margin-top: .5rem; border-left: 3px solid #a7b5bc; background: #f4f7f8; }
+.workQuestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.workQuestions h4 { margin: .5rem 0; }
+.evidenceGap { padding: .7rem; background: #f8f4e9; border-left: 3px solid #bdab7c; font-size: .9rem; }
+.perspective { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; max-width: 100%; }
+.perspective select { max-width: 100%; }
 @media (max-width: 40rem) {
-  .insightGrid { grid-template-columns: minmax(0, 1fr); }
-  .insightGrid > p, .insightGrid > div { grid-column: auto; }
+  .quickFacts { grid-template-columns: minmax(0, 1fr); }
+  .quickFacts p { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: .25rem .4rem; align-items: baseline; }
+  .questionNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workQuestions { grid-template-columns: minmax(0, 1fr); }
+  .questionPanel { padding: .75rem; }
 }
