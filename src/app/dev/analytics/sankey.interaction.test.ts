@@ -13,10 +13,11 @@ async function render() {
   p.stations.push(overviewStation({ id: "later", position: 4, startYear: 2021, sector: "IT & Technologie" }));
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(createElement(Dashboard, { profiles: [p, q] })));
+  await act(async () => button(host, "Typische Karrierepfade").click());
   return host.querySelector<HTMLElement>('section[aria-label="MSI-Sankey"]')!;
 }
 const button = (host: HTMLElement, text: string) => Array.from(host.querySelectorAll("button")).find(b => b.textContent === text)!;
-it("defaults to four stages, switches to the seven-stage combinations without losing profile selection", async () => {
+it("retains the four-stage strict view, switches to the seven-stage combinations without losing profile selection", async () => {
   const host = await render();
   expect(button(host, "Typische Karrierepfade").getAttribute("aria-pressed")).toBe("true");
   expect(host.querySelectorAll("[data-stage-heading]")).toHaveLength(4);
@@ -58,6 +59,7 @@ it("offers frequency sorting and keeps absence and uncertainty as distinct label
   const q = overviewProfile("unknown"); q.completeTestCase = false; q.stations = q.stations.slice(0, 1);
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(createElement(Dashboard, { profiles: [p, q] })));
+  await act(async () => button(host, "Typische Karrierepfade").click());
   expect(host.querySelector('[data-node-state="absent"]')).not.toBeNull();
   expect(host.querySelector('[data-node-state="unknown"]')).not.toBeNull();
   expect(host.querySelector('select[aria-label="Knotensortierung"]')!.getAttribute("id")).toBeTruthy();

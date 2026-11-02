@@ -54,6 +54,7 @@
     ".next-surveys-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
+    ".local-demo",
     "node_modules"
   ]
 }

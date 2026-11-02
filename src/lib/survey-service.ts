@@ -57,13 +57,19 @@ export async function updateSurveyStatus(
   status: SurveyStatus,
   authorize?: (tx: Prisma.TransactionClient, survey: LockedSurvey) => Promise<void>,
 ): Promise<Survey> {
-  return client.$transaction(async tx => {
-    const survey = await lockSurvey(tx, surveyId);
-    // Operator-facing callers validate affiliation under the same row lock.
-    await authorize?.(tx, survey);
-    return tx.survey.update({
-      where: { id: surveyId },
-      data: { status, updatedAt: new Date() },
-    });
-  }, { isolationLevel: "ReadCommitted" });
+  return client.$transaction(tx => updateSurveyStatusInTransaction(tx, surveyId, status, authorize), { isolationLevel: "ReadCommitted" });
+}
+
+/** Composition point: same lock/authorization contract, without a nested
+ * transaction. Caller owns commit/rollback and must use this tx for all writes.
+ */
+export async function updateSurveyStatusInTransaction(
+  tx: Prisma.TransactionClient,
+  surveyId: string,
+  status: SurveyStatus,
+  authorize?: (tx: Prisma.TransactionClient, survey: LockedSurvey) => Promise<void>,
+): Promise<Survey> {
+  const survey = await lockSurvey(tx, surveyId);
+  await authorize?.(tx, survey);
+  return tx.survey.update({ where: { id: surveyId }, data: { status, updatedAt: new Date() } });
 }

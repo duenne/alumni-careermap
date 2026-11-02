@@ -1,0 +1,18 @@
+.manager { gap: .75rem; }
+.manager h2 { margin-block: 0 .25rem; }
+.creationForms[hidden] { display: none; }
+.surveyCard { display: grid; gap: .65rem; padding: 1rem; }
+.surveyCard :is(h3, p) { margin: 0; }
+.surveyCard > div { min-width: 0; }
+.surveyCard :global(.demoNote) { margin: 0; }
+.cardHeading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; }
+.cardHeading h3 { flex: 1 1 20rem; }
+.status { font-size: .875rem; }
+.cardMeta { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem 1rem; }
+.surveyCard .cardMeta + div { margin-block: 0; }
+.invitation { display: grid; gap: .5rem 1rem; min-width: 0; }
+.invitation > div { margin-block: 0; }
+@media (min-width: 50rem) {
+  .invitation { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+  .invitation > p { grid-column: 1 / -1; }
+}

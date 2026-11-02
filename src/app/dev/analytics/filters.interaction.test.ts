@@ -12,6 +12,7 @@ async function mount(onlyUnknown = false) {
   b.stations = b.stations.filter(s => s.type !== "MASTER"); c.stations[1].startYear = null;
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(createElement(Dashboard, { profiles: onlyUnknown ? [c] : [a, b, c] })));
+  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Typische Karrierepfade")!.click());
   return host;
 }
 async function choose(host: HTMLElement, id: string, value: string) {

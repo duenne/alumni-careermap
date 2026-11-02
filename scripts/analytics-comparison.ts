@@ -11,6 +11,7 @@ import { filterMasterProfiles } from "../src/lib/analytics/filters";
 import { createSankeyLayout } from "../src/lib/analytics/sankey-layout";
 import { overviewStages } from "../src/lib/analytics/overview";
 import { stages } from "../src/lib/analytics/aggregate";
+import { understandCareers, understandingStages } from "../src/lib/analytics/understanding";
 
 const top = (flow: CareerFlow, stage: number) => flow.nodes.filter(n => n.stage === stage).map(n => ({ category: n.label, state: n.state, people: flow.paths.filter(p => p.nodes.includes(n.id)).length })).sort((a, b) => b.people - a.people || a.category.localeCompare(b.category, "de"));
 async function main() {
@@ -20,9 +21,15 @@ async function main() {
   try {
     const data = await readAnalytics(client, url);
     const old = aggregateCareers(data.profiles), current = aggregateOverview(data.profiles);
+    const understanding = understandCareers(data.profiles);
     const counts = (values: string[]) => values.reduce<Record<string, number>>((map, v) => { map[v] = (map[v] ?? 0) + 1; return map; }, {});
     const report = {
       canonical: data.counts,
+      understanding: { ...understanding.facts, groups: understanding.groups.map(g => ({ sequence: g.label, people: g.alumniIds.length })),
+        people: understanding.flow.included, excluded: understanding.flow.excluded.length,
+        unknownNodes: understanding.flow.nodes.filter(n => n.state === "unknown").length,
+        transitions: understanding.flow.links.reduce((sum, l) => sum + l.value, 0),
+        layoutAt1280: { width: createSankeyLayout(understanding.flow, understandingStages, 1280, "frequency").width, height: createSankeyLayout(understanding.flow, understandingStages, 1280, "frequency").height } },
       history: { people: old.included, partial: old.partial, excluded: old.excluded.length, nodes: old.nodes.length, links: old.links.length, transitions: old.links.reduce((n, l) => n + l.value, 0),
         unknownBeforeEducation: old.paths.filter(p => old.nodes.find(n => n.id === p.nodes[0])?.state === "unknown").length,
         unclearWorkAfter: old.paths.filter(p => old.nodes.find(n => n.id === p.nodes[5])?.state === "unknown").length,

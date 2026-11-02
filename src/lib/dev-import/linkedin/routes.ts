@@ -18,7 +18,7 @@ function cookieResponse(response: NextResponse, request: NextRequest, value = ""
     path: "/", maxAge: value ? SESSION_SECONDS : 0 });
   return response;
 }
-type RouteOptions = { apiPath?: string; cookieName?: string; allowed?: (request: NextRequest, callback: boolean) => boolean; returnPath?: (request: NextRequest) => string };
+type RouteOptions = { apiPath?: string; cookieName?: string; statePrefix?: string; acceptRequestOrigin?: (request: NextRequest, config: LinkedInConfig) => boolean; allowed?: (request: NextRequest, callback: boolean) => boolean; returnPath?: (request: NextRequest) => string };
 type Dependencies = { config: () => LinkedInConfig | null; provider: (config: LinkedInConfig) => CareerDataProvider; store: EphemeralLinkedInSessions };
 
 export function createLinkedInHandlers({ config: readConfig, provider, store }: Dependencies, options: RouteOptions = {}) {
@@ -28,7 +28,7 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
   // the OAuth redirect and the browser's Origin remain exactly identical.
   const requestOrigin = (request: NextRequest) => `${new URL(request.url).protocol}//${request.headers.get("host")}`;
   function configFor(request: NextRequest, config = readConfig()) {
-    return config && new URL(config.redirectUri).origin === requestOrigin(request) ? config : null;
+    return config && (new URL(config.redirectUri).origin === requestOrigin(request) || options.acceptRequestOrigin?.(request, config)) ? config : null;
   }
   const action = (request: NextRequest) => {
     const path = new URL(request.url).pathname;
@@ -89,7 +89,7 @@ export function createLinkedInHandlers({ config: readConfig, provider, store }: 
       if (!config) return error("NOT_CONFIGURED", 503);
       if (name === "start") {
         store.remove(cookie(request));
-        const session = store.create(configKey(config));
+        const session = store.create(configKey(config), options.statePrefix);
         if (!session) return error("BUSY", 429);
         return setCookie(new NextResponse(null, { status: 303, headers: { ...headers, Location: provider(config).authorizationUrl(session.state) } }), request, session.id);
       }

@@ -1,8 +1,8 @@
-type Environment = { NODE_ENV?: string; CAREERMAP_DEV_IMPORT?: string };
+type Environment = { NODE_ENV?: string; CAREERMAP_DEV_IMPORT?: string; CAREERMAP_LOCAL_DEMO?: string };
 
 /** Server-side opt-in. Forwarded headers never establish local authorization. */
 export function allowDevImport(headers: Headers, env: Environment = process.env): boolean {
-  if (env.NODE_ENV !== "development" || env.CAREERMAP_DEV_IMPORT !== "1") return false;
+  if (env.NODE_ENV !== "development" || env.CAREERMAP_DEV_IMPORT !== "1" || env.CAREERMAP_LOCAL_DEMO !== undefined) return false;
   const host = headers.get("host") ?? "";
   if (!/^(127\.0\.0\.1|localhost)(:[0-9]+)?$/.test(host)) return false;
   // Next itself adds these headers. Accept its local values, never a proxy host.

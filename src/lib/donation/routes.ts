@@ -9,7 +9,7 @@ import { saveCareerImport } from "../career-import/service";
 import { CareerImportError } from "../career-import/mapping";
 import { localLinkedInSessions } from "../dev-import/linkedin/sessions";
 import { syntheticDonation } from "./synthetic";
-export const donationAllowed = (request: Request) => process.env.CAREERMAP_DEV_DONATION === "1" && surveyAccess(request.headers,false)===200;
+export const donationAllowed = (request: Request) => process.env.NODE_ENV === "development" && process.env.CAREERMAP_LOCAL_DEMO === undefined && process.env.CAREERMAP_DEV_DONATION === "1" && surveyAccess(request.headers,false)===200;
 const json=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:surveyHeaders});
 export async function readBoundedBody(request:Request){
  if(!request.body || request.headers.get("content-type")?.split(";")[0]!=="application/json") throw new Error("INVALID_REQUEST");

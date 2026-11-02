@@ -35,4 +35,73 @@
 .chartWrap [role=button]:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
 .help { color: #555; font-size: .85rem; }
 .flowSummary { font-weight: 700; }
+.survey { padding-block: 1rem 2rem; }
+.intro h1 { max-width: 50ch; margin: .5rem 0; font-size: clamp(1.65rem, 3vw, 2.5rem); line-height: 1.2; }
+.intro > p { max-width: 85ch; margin-block: .65rem; }
+.intro .demoNotice { color: #665329; background: #faf5e6; border-left: 3px solid #bda55f; padding: .6rem .8rem; font-size: .9rem; }
+.survey .stats { margin: 1rem 0; gap: .65rem; }
+.survey .stats div { padding: .65rem 1rem; min-width: 0; }
+.intro .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 26rem; }
+.intro .stats dt { line-height: 1.35; }
+.intro .stats dd { font-size: 1.5rem; }
+.survey section { margin-top: 1rem; }
+.survey h2 { font-size: 1.2rem; margin-block: .8rem .5rem; }
+.survey .legend { gap: .4rem 1rem; font-size: .8rem; margin-block: .6rem; }
+.survey .swatch { width: 12px; height: 12px; }
+.survey .help { margin-block: .5rem; }
+.survey .chartNote { min-height: 0; margin-block: .5rem; font-size: .85rem; }
+.disclosure { margin-top: .6rem; padding: .75rem 1rem; border: 1px solid #dedede; border-radius: 8px; background: white; }
+.disclosure > summary { font-weight: 600; min-height: 24px; }
+.disclosure > summary:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.disclosure[open] > summary { margin-bottom: .75rem; }
 @media (max-width: 40rem) { .controls { align-items: stretch; } .controls label { width: 100%; } }
+.insights { padding: 1rem 1.25rem; background: #f2f6f5; border: 1px solid #cbded9; border-radius: 10px; }
+.careerGroups > ol, .careerGroups details > ol { padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: .6rem; }
+.careerGroups li { min-width: 0; }
+.careerGroups li button { width: 100%; height: 100%; display: flex; align-items: baseline; gap: .8rem; text-align: left; border-color: #cbd3db; }
+.careerGroups li button strong { white-space: nowrap; color: #633c91; }
+.careerGroups li button span { overflow-wrap: anywhere; }
+.careerGroups li button[aria-pressed=true] { background: #f1eafa; border-color: #633c91; }
+.groupDetail { border-left: 4px solid #633c91; padding: .5rem 1rem; background: #f6f1fb; }
+.selectedCareer { padding: 1rem; background: #f6f1fb; border: 1px solid #d4c1ed; border-radius: 8px; }
+.selectedCareer > h3 { margin-top: 0; }
+.selectedCareer > ol { list-style: none; display: flex; overflow-x: auto; gap: .8rem; padding: .5rem 0 1rem; }
+.selectedCareer li { flex: 0 0 14rem; padding: .8rem; background: white; border-top: 4px solid #b5d6ef; display: flex; flex-direction: column; gap: .4rem; font-size: .85rem; }
+.selectedCareer li[data-reference-station=true] { border-color: #9a80c1; }
+.selectedCareer > ol { counter-reset: career-station; }
+.selectedCareer li { counter-increment: career-station; }
+.selectedCareer li::before { content: "Station " counter(career-station); font-size: .75rem; font-weight: 700; color: #633c91; }
+.careerPreview { display: block; font-size: .8rem; color: #555; max-width: 24ch; }
+.quickFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem 1rem; margin-block: .75rem; }
+.quickFacts p { margin: 0; }
+.quickFacts strong, .quickFacts span { display: block; }
+.quickFacts strong { font-size: 1.2rem; color: #3e5260; }
+.quickFacts span { font-size: .85rem; }
+.questionNav { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: 1rem; }
+.questionNav button[aria-pressed=true] { background: #e1ebe8; border-color: #50776a; font-weight: 700; }
+.questionPanel { background: white; border: 1px solid #dbe4e0; border-radius: 6px; padding: 1rem; }
+.questionPanel h3 { margin-top: 0; }
+.questionFigure { margin: .8rem 0; }
+.questionFigure figcaption { font-size: .85rem; color: #555; margin-bottom: .6rem; }
+.questionBars { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .65rem; }
+.questionBars li > div { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; font-size: .85rem; }
+.questionBars li strong { white-space: nowrap; font-size: .8rem; }
+.barTrack { display: block; height: .4rem; margin-top: .25rem; background: #eef1f3; border-radius: 4px; overflow: hidden; }
+.barTrack > span { display: block; height: 100%; background: #859eb2; }
+.contextHelp { margin-block: .75rem .25rem; }
+.contextHelp > summary { list-style: none; display: inline-flex; justify-content: center; align-items: center; width: 44px; height: 44px; border: 1px solid #a7b5bc; border-radius: 50%; background: white; font-weight: 700; color: #3e5260; }
+.contextHelp > summary::-webkit-details-marker { display: none; }
+.contextHelp > summary:focus-visible { outline: 3px solid #146d86; outline-offset: 3px; }
+.contextHelp > div { font-size: .85rem; color: #4d565b; padding: .5rem .75rem; margin-top: .5rem; border-left: 3px solid #a7b5bc; background: #f4f7f8; }
+.workQuestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.workQuestions h4 { margin: .5rem 0; }
+.evidenceGap { padding: .7rem; background: #f8f4e9; border-left: 3px solid #bdab7c; font-size: .9rem; }
+.perspective { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; max-width: 100%; }
+.perspective select { max-width: 100%; }
+@media (max-width: 40rem) {
+  .quickFacts { grid-template-columns: minmax(0, 1fr); }
+  .quickFacts p { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: .25rem .4rem; align-items: baseline; }
+  .questionNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workQuestions { grid-template-columns: minmax(0, 1fr); }
+  .questionPanel { padding: .75rem; }
+}

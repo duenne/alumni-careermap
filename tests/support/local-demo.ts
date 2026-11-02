@@ -1,0 +1,12 @@
+export function localDemoEnvironment(): Record<string, string | undefined> {
+  return {
+    NODE_ENV: "production", CAREERMAP_LOCAL_DEMO: "v5-synthetic", CAREERMAP_LOCAL_DEMO_PURPOSE: "SYNTHETIC_DEMO_ONLY",
+    CAREERMAP_LOCAL_DEMO_INSTALLATION_ID: "11111111-1111-4111-8111-111111111111",
+    CAREERMAP_LOCAL_DEMO_ORIGIN: "http://127.0.0.1:3114",
+    CAREERMAP_LOCAL_DEMO_DATABASE_URL: "postgresql://careermap_v5_demo:synthetic-db-password@127.0.0.1:5435/careermap_v5_demo",
+    CAREERMAP_LOCAL_DEMO_OPERATOR_ID: "22222222-2222-4222-8222-222222222222",
+    CAREERMAP_LOCAL_DEMO_MSI_PROGRAM_ID: "33333333-3333-4333-8333-333333333333",
+    CAREERMAP_LOCAL_DEMO_OPERATOR_KIND: "INSTITUTION",
+    CAREERMAP_SURVEY_ADMIN_TOKEN: "synthetic-separate-operator-password-32-characters",
+  };
+}

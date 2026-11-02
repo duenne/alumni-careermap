@@ -4,6 +4,7 @@ node_modules
 .next-workflow-test
 .next-workflow-e2e
 .local-fixtures
+.local-demo
 .git
 coverage
 src/generated

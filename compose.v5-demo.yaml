@@ -1,0 +1,30 @@
+services:
+  db:
+    image: ${CAREERMAP_V5_IMAGE:?Pinned PG17 image required}
+    environment:
+      POSTGRES_DB: careermap_v5_demo
+      POSTGRES_USER: careermap_v5_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/admin_password
+    secrets:
+      - admin_password
+    ports:
+      - "127.0.0.1:${CAREERMAP_V5_DB_PORT:?Explicit local port required}:5432"
+    volumes:
+      - v5_data:/var/lib/postgresql/data
+    labels:
+      de.careermap.v5.installation: ${CAREERMAP_V5_INSTALLATION_ID:?Installation required}
+      de.careermap.v5.purpose: SYNTHETIC_DEMO_ONLY
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careermap_v5_admin -d careermap_v5_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    stop_grace_period: 30s
+    restart: unless-stopped
+volumes:
+  v5_data:
+    external: true
+    name: ${CAREERMAP_V5_VOLUME:?Owned persistent volume required}
+secrets:
+  admin_password:
+    file: ${CAREERMAP_V5_ADMIN_PASSWORD_FILE:?Private password file required}

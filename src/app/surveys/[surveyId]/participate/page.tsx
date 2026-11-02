@@ -7,7 +7,7 @@ import { mappingClient } from "../../../../lib/career-import/sandbox-db";
 import { isSurveyId, readSurveyInvitation } from "../../../../lib/surveys/service";
 export const metadata={title:"Karriereweg prüfen · Alumni CareerMap",robots:{index:false,follow:false}};
 export default async function Participate({params}:{params:Promise<{surveyId:string}>}){
- if(process.env.CAREERMAP_DEV_DONATION!=="1"||surveyAccess(await headers(),false)!==200)notFound();
+ if(process.env.NODE_ENV!=="development"||process.env.CAREERMAP_LOCAL_DEMO!==undefined||process.env.CAREERMAP_DEV_DONATION!=="1"||surveyAccess(await headers(),false)!==200)notFound();
  const {surveyId}=await params;if(!isSurveyId(surveyId))notFound();
  const s=donationSessions.get((await cookies()).get(donationCookie)?.value,surveyId);if(!s)redirect(`/surveys/${surveyId}?session=missing`);
  const survey=await readSurveyInvitation(await mappingClient(),surveyId,surveyConfiguration());
