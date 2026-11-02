@@ -5,6 +5,8 @@ import type { SurveyAdministration, SurveyContext } from "../../../lib/surveys/s
 import styles from "../../surveys/surveys.module.css";
 import adminStyles from "./survey-manager.module.css";
 import { institutionLabel } from "../../../lib/surveys/presentation";
+import { InstitutionBrand } from "../../surveys/survey-introduction";
+import SurveyEditor from "./survey-editor";
 
 const statusLabels = { DRAFT: "Entwurf", OPEN: "Geöffnet", CLOSED: "Geschlossen" };
 async function loadAdministration(): Promise<SurveyAdministration> {
@@ -24,6 +26,8 @@ export default function SurveyManager() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [origin, setOrigin] = useState("");
+  const [editing, setEditing] = useState<string>();
+  const overviewHeading = "existing-surveys";
 
   useEffect(() => {
     let active = true;
@@ -55,40 +59,56 @@ export default function SurveyManager() {
     catch { setError("Kopieren nicht möglich. Bitte den Einladungslink im Textfeld markieren und kopieren."); }
   }
   const programs = data?.institutions.find(i => i.id === institutionId)?.programs ?? [];
+  function toggleCreation() {
+    setShowCreation(value => !value);
+    if (!showCreation) requestAnimationFrame(() => document.getElementById("survey-creation")?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
+  }
+  const selected = data?.surveys.find(survey => survey.id === editing);
+  if (selected) return <div className={`${styles.stack} ${adminStyles.manager}`}><SurveyEditor key={selected.id} survey={selected} origin={origin}
+    onSaved={saved => setData(current => current && ({ ...current, surveys: current.surveys.map(survey => survey.id === saved.id ? saved : survey) }))}
+    onClose={() => { setEditing(undefined); requestAnimationFrame(() => document.getElementById(overviewHeading)?.focus()); }} /></div>;
   return <div className={`${styles.stack} ${adminStyles.manager}`}>
     <p role="status" aria-live="polite">{message}</p>
     {error && <p role="alert">{error}</p>}
     {!data && !error && <p>Befragungen werden geladen …</p>}
     {data && <>
+      <div className={adminStyles.overviewTop}>
+        {data.institutions[0] && <InstitutionBrand institution={data.institutions[0]} />}
+        <button type="button" aria-expanded={showCreation} aria-controls="survey-creation" onClick={toggleCreation}>{showCreation ? "Anlegen schließen" : "Neue Befragung"}</button>
+      </div>
+      <dl className={adminStyles.summary} aria-label="Befragungsübersicht">
+        <div><dt>Befragungen</dt><dd>{data.surveys.length}</dd></div>
+        <div><dt>Geöffnet</dt><dd>{data.surveys.filter(survey => survey.status === "OPEN").length}</dd></div>
+        <div><dt>Bestätigte Teilnahmen</dt><dd>{data.surveys.reduce((count, survey) => count + survey._count.responses, 0)}</dd></div>
+      </dl>
       <section aria-labelledby="existing-surveys" className={styles.stack}>
-        <h2 id="existing-surveys">Vorhandene Befragungen</h2>
+        <h2 id="existing-surveys" tabIndex={-1}>Deine Befragungen</h2>
         {!data.surveys.length && <p>Noch keine Befragungen vorhanden.</p>}
         {data.surveys.map(survey => <article key={survey.id} className={`${styles.card} ${adminStyles.surveyCard}`} aria-label={survey.name}>
           <div className={adminStyles.cardHeading}>
             <h3>{survey.name}</h3>
-            <p className={adminStyles.status}><strong>Status: {statusLabels[survey.status]} ({survey.status})</strong></p>
+            <p className={adminStyles.status} data-status={survey.status}><span className={adminStyles.statusDot} aria-hidden="true" />{statusLabels[survey.status]}</p>
           </div>
           <p>{institutionLabel(survey.referenceProgram.institution)} · {survey.referenceProgram.name}{survey.referenceProgram.faculty ? ` · ${survey.referenceProgram.faculty}` : ""}</p>
           <div className={adminStyles.cardMeta}>
-            <p><strong>Antworten: {survey._count.responses}</strong></p>
-            <p className="demoNote">Der Referenzstudiengang ist seit Anlage festgelegt.</p>
+            <p className={adminStyles.responseCount}><strong>{survey._count.responses}</strong> bestätigte Teilnahmen</p>
           </div>
           <div className={styles.actions}>
-            <a href={`/admin/surveys/${survey.id}/analytics`}>Bestätigte Antworten auswerten</a>
-            {survey.status !== "OPEN" && <button disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "OPEN" }, `„${survey.name}“ geöffnet.`)}>{survey.status === "CLOSED" ? "Wieder öffnen" : "Befragung öffnen"}</button>}
-            {survey.status === "OPEN" && <button disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "CLOSED" }, `„${survey.name}“ geschlossen.`)}>Befragung schließen</button>}
+            <button type="button" disabled={busy} onClick={() => { setMessage(""); setError(""); setEditing(survey.id); }}>Bearbeiten</button>
+            <a className={adminStyles.actionLink} href={`/admin/surveys/${survey.id}/analytics`}>Auswertung ansehen</a>
+            {survey.status !== "OPEN" && <button className={adminStyles.secondary} disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "OPEN" }, `„${survey.name}“ geöffnet.`)}>{survey.status === "CLOSED" ? "Wieder öffnen" : "Befragung öffnen"}</button>}
+            {survey.status === "OPEN" && <button className={adminStyles.secondary} disabled={busy} onClick={() => void mutate({ action: "status", surveyId: survey.id, status: "CLOSED" }, `„${survey.name}“ geschlossen.`)}>Befragung schließen</button>}
           </div>
           {survey.status === "DRAFT" ? <p>Der Einladungslink wird nach dem Öffnen bereitgestellt.</p> : <div className={adminStyles.invitation}>
             <label>Einladungslink<input readOnly value={`${origin}/surveys/${survey.id}`} onFocus={event => event.target.select()} /></label>
             <div className={styles.actions}>
-              {survey.status === "OPEN" && <button disabled={busy} onClick={() => void copy(survey)}>Einladungslink kopieren</button>}
+              {survey.status === "OPEN" && <button className={adminStyles.secondary} disabled={busy} onClick={() => void copy(survey)}>Einladungslink kopieren</button>}
               <a href={`/surveys/${survey.id}`} target="_blank" rel="noreferrer">Alumni-Einstieg ansehen</a>
             </div>
             {survey.status === "CLOSED" && <p>Der Link zeigt jetzt den Hinweis auf die geschlossene Befragung.</p>}
           </div>}
         </article>)}
       </section>
-      <button type="button" aria-expanded={showCreation} aria-controls="survey-creation" onClick={() => setShowCreation(value => !value)}>Neu anlegen</button>
       <div id="survey-creation" hidden={!showCreation} className={`${styles.stack} ${adminStyles.creationForms}`}>
         <section aria-labelledby="catalog-heading" className={styles.card}>
           <h2 id="catalog-heading">Fakultät und Studiengang ergänzen</h2>

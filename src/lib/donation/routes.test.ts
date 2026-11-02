@@ -10,7 +10,7 @@ import type { PrismaClient } from "../../generated/prisma/client";
 const a="00000000-0000-4000-8000-000000000001",b="00000000-0000-4000-8000-000000000002";
 const req=(body?:unknown,cookie="",origin="http://localhost:3111")=>new NextRequest(`http://localhost:3111/api/surveys/${a}/donation`,{method:body?"POST":"GET",headers:{host:"localhost:3111",origin,"content-type":"application/json",cookie},...(body?{body:JSON.stringify(body)}:{})});
 beforeEach(()=>{for(const [k,v] of Object.entries({NODE_ENV:"development",CAREERMAP_DEV_SURVEYS:"1",CAREERMAP_DEV_DONATION:"1",CAREERMAP_SYNTHETIC_DONATION:"1",CAREERMAP_SURVEY_OPERATOR_KIND:"INSTITUTION",CAREERMAP_MAPPING_OPERATOR_ID:a}))vi.stubEnv(k,v);
- vi.mocked(readSurveyInvitation).mockResolvedValue({id:a,name:"Synthetic",status:"OPEN",referenceProgram:{id:b,name:"Synthetic MSI",faculty:null,institution:{id:a,name:"Synthetic institute"}}});
+ vi.mocked(readSurveyInvitation).mockResolvedValue({id:a,name:"Synthetic",status:"OPEN",entryHeading:null,entryIntro:null,entryWelcome:null,entryPurpose:null,entryContact:null,referenceProgram:{id:b,name:"Synthetic MSI",faculty:null,institution:{id:a,name:"Synthetic institute"}}});
  vi.mocked(saveCareerImport).mockResolvedValue({alumniId:"PRIVATE_ID",responseId:"PRIVATE_RESPONSE",degrees:1,careerSteps:0,timelineItems:1});});
 afterEach(()=>{vi.unstubAllEnvs();vi.clearAllMocks();});
 it("binds the participant to one survey and never exposes receipt identifiers or other profiles",async()=>{

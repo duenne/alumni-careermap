@@ -20,6 +20,8 @@ function administration(): SurveyAdministration {
       id: `00000000-0000-4000-8000-00000000002${index}`,
       name: `SYNTHETISCH / DEMO – ${index ? "Master Informatik" : "Alumni MSI"}`,
       status: index ? "DRAFT" : "CLOSED",
+      updatedAt: new Date("2026-11-02T10:00:00.000Z"),
+      entryHeading: null, entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null,
       referenceProgram: { ...program, institution: { ...demoInstitution } },
       // Deliberately differ from documented demo counts: the API is authoritative.
       _count: { responses: index ? 3 : 27 },
@@ -33,8 +35,11 @@ afterEach(async () => {
   root = undefined; vi.unstubAllGlobals(); document.body.replaceChildren();
 });
 async function mount(data = administration()) {
-  const fetch = vi.fn(async (_url: string, options?: RequestInit) => options?.method === "POST"
-    ? new Response(null, { status: 201 }) : Response.json(data));
+  const fetch = vi.fn(async (_url: string, options?: RequestInit) => {
+    if (options?.method !== "POST") return Response.json(data);
+    const body = JSON.parse(options.body as string);
+    return body.action === "edit" ? Response.json({ ...data.surveys.find(s => s.id === body.surveyId), ...body, updatedAt: new Date().toISOString() }) : new Response(null, { status: 201 });
+  });
   vi.stubGlobal("fetch", fetch);
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => root!.render(createElement(SurveyManager)));
@@ -57,11 +62,11 @@ it("shows all API surveys first with their current counts, statuses and existing
   const cards = host.querySelectorAll("article");
   expect(cards).toHaveLength(2);
   expect(cards[0].textContent).toContain("Management Sozialer Innovationen");
-  expect(cards[0].textContent).toContain("Status: Geschlossen (CLOSED)");
-  expect(cards[0].textContent).toContain("Antworten: 27");
+  expect(cards[0].textContent).toContain("Geschlossen");
+  expect(cards[0].textContent).toContain("27 bestätigte Teilnahmen");
   expect(cards[1].textContent).toContain("Master Informatik");
-  expect(cards[1].textContent).toContain("Status: Entwurf (DRAFT)");
-  expect(cards[1].textContent).toContain("Antworten: 3");
+  expect(cards[1].textContent).toContain("Entwurf");
+  expect(cards[1].textContent).toContain("3 bestätigte Teilnahmen");
   expect(cards[0].querySelector("a")?.getAttribute("href")).toBe("/admin/surveys/00000000-0000-4000-8000-000000000020/analytics");
   expect(cards[0].querySelector("input")?.value).toBe(`${window.location.origin}/surveys/00000000-0000-4000-8000-000000000020`);
   expect(cards[0].querySelector('a[target="_blank"]')?.getAttribute("href")).toBe("/surveys/00000000-0000-4000-8000-000000000020");
@@ -71,7 +76,7 @@ it("shows all API surveys first with their current counts, statuses and existing
 
 it("toggles both creation forms accessibly and preserves unfinished input", async () => {
   const { host } = await mount();
-  const toggle = button(host, "Neu anlegen");
+  const toggle = button(host, "Neue Befragung");
   expect(toggle).toBeDefined();
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
@@ -102,7 +107,7 @@ it("uses the readable name only for the exact known demo institution, preserving
   expect(cards[0].textContent).toContain("Hochschule München");
   expect(cards[1].textContent).toContain("Hochschule München");
   others.forEach((institution, index) => expect(cards[index + 2].textContent).toContain(institution.name));
-  await act(async () => button(host, "Neu anlegen").click());
+  await act(async () => button(host, "Neue Befragung").click());
   const options = host.querySelectorAll<HTMLOptionElement>("#survey-institution option");
   expect(options[1].textContent).toBe("Hochschule München");
   expect(options[1].value).toBe(demoInstitution.id);
@@ -122,7 +127,7 @@ it("preserves a changed name even when the institution ID matches the known demo
 it("keeps creation requests and status/link actions working after expanding the forms", async () => {
   const data = administration();
   const { host, fetch } = await mount(data);
-  await act(async () => button(host, "Neu anlegen").click());
+  await act(async () => button(host, "Neue Befragung").click());
   await change(host, 'input[list="catalog-faculties"]', "Synthetische Fakultät");
   await change(host, 'input[required]', "Synthetischer Studiengang");
   expect(button(host, "Studiengang hinzufügen").disabled).toBe(false);
@@ -150,4 +155,46 @@ it("shows an empty API result without inventing demo surveys", async () => {
   const { host } = await mount({ institutions: [], surveys: [], facultyScope: null });
   expect(host.querySelectorAll("article")).toHaveLength(0);
   expect(host.textContent).toContain("Noch keine Befragungen vorhanden.");
+});
+
+it("previews unsaved text, discards changes and saves only the selected survey", async () => {
+  const { host, fetch } = await mount();
+  await act(async () => button(host, "Bearbeiten").click());
+  await change(host, '#edit-name', "Synthetic edited survey");
+  const field = host.querySelector<HTMLTextAreaElement>('#edit-entryWelcome')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Synthetic welcome");
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(host.querySelector('[aria-label="Vorschau des Alumni-Einstiegs"]')!.textContent).toContain("Synthetic welcome");
+  expect(host.textContent).toContain("Ungespeicherte Änderungen");
+  expect(fetch.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(0);
+  await act(async () => button(host, "Verwerfen").click());
+  expect(host.querySelector<HTMLInputElement>('#edit-name')!.value).toBe(administration().surveys[0].name);
+  await change(host, '#edit-name', "Synthetic saved survey");
+  await act(async () => host.querySelector('#survey-editor form')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  const body = JSON.parse(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
+  expect(body).toMatchObject({ action: "edit", surveyId: administration().surveys[0].id, name: "Synthetic saved survey" });
+  expect(body).not.toHaveProperty("referenceProgramId");
+  expect(body).not.toHaveProperty("status");
+  expect(host.querySelector('[role="status"]')!.textContent).toBe("Änderungen gespeichert.");
+  expect(button(host, "Änderungen speichern").disabled).toBe(true);
+});
+
+it("retains edits on a save conflict and warns before leaving the editor", async () => {
+  const { host, fetch } = await mount();
+  await act(async () => button(host, "Bearbeiten").click());
+  await change(host, '#edit-name', "Synthetic unsaved edit");
+  fetch.mockImplementation(async () => Response.json({ code: "EDIT_CONFLICT" }, { status: 409 }));
+  await act(async () => host.querySelector('#survey-editor form')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(host.querySelector<HTMLInputElement>('#edit-name')!.value).toBe("Synthetic unsaved edit");
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain("inzwischen geändert");
+  await act(async () => button(host, "← Zur Übersicht").click());
+  expect(button(host, "Weiter bearbeiten")).toBeDefined();
+  await act(async () => button(host, "Weiter bearbeiten").click());
+  expect(host.querySelector<HTMLInputElement>('#edit-name')!.value).toBe("Synthetic unsaved edit");
+  await act(async () => button(host, "← Zur Übersicht").click());
+  await act(async () => button(host, "Änderungen verwerfen und zurück").click());
+  expect(host.querySelector('#survey-editor')).toBeNull();
+  expect(host.querySelector('article')!.textContent).toContain(administration().surveys[0].name);
 });

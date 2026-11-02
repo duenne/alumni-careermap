@@ -1,0 +1,13 @@
+.introduction { display: grid; gap: 1.5rem; min-width: 0; }
+.brand { display: flex; align-items: center; gap: .85rem; padding-block: .25rem 1rem; border-bottom: 1px solid #e5e5e7; }
+.brand > div { display: grid; gap: .1rem; }
+.brand strong { font-size: 1rem; }
+.brand span { color: #62616a; font-size: .8rem; }
+.brand .logo { display: block; width: 50px; height: 50px; flex: none; background: url('/hm-mark.svg') center / contain no-repeat; }
+.hero { padding: clamp(1.25rem, 4vw, 2.5rem); border-radius: 12px; background: #f8efef; border: 1px solid #efdddd; }
+.program { margin: 0 0 1rem; font-size: .875rem; color: #912034; font-weight: 700; }
+.hero :is(h1, h3) { margin: 0 0 1rem; font-size: clamp(1.65rem, 3vw, 2.6rem); letter-spacing: -.035em; }
+.intro { margin: 0; font-size: 1.1rem; line-height: 1.55; white-space: pre-wrap; }
+.welcome { white-space: pre-wrap; line-height: 1.8; }
+.purpose, .contact { padding: 1.25rem; border-radius: 10px; background: white; border: 1px solid #e5e5e7; }
+.purpose p, .contact p { white-space: pre-wrap; margin: .5rem 0 0; }

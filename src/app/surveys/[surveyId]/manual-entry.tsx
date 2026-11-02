@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { classificationChoices, degreeStatuses, careerStatuses } from "../../../lib/career-review/preview";
 import { parseManualParticipation, ManualParticipationError, type ManualStation, type ManualDegree, type ManualCareerStep } from "../../../lib/donation/manual";
 import styles from "../surveys.module.css";
+import JourneyProgress from "../journey-progress";
 
 type Receipt = { degrees: number; careerSteps: number; timelineItems: number };
 const degree = (first = false): ManualDegree => ({ key: crypto.randomUUID(), kind: "DEGREE", title: "", level: "", status: "", program: first ? "SURVEY" : "OTHER", institutionName: "", fieldOfStudy: "", startYear: null, endYear: null, graduationYear: null });
@@ -18,6 +19,10 @@ export default function ManualEntry({ surveyId, programName, institutionName, re
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState(initialReceipt);
+  const sectionHeading = useRef<HTMLHeadingElement>(null);
+  const errorNotice = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (reviewing || receipt) sectionHeading.current?.focus(); }, [reviewing, receipt]);
+  useEffect(() => { if (error) errorNotice.current?.focus(); }, [error]);
   const input = { stations, referenceKey, referenceConfirmed, contributionConfirmed };
   const candidates = stations.filter(s => s.kind === "DEGREE" && s.program === "SURVEY" && s.status === "COMPLETED");
   function update(key: string, changes: Partial<ManualStation>) {
@@ -49,17 +54,21 @@ export default function ManualEntry({ surveyId, programName, institutionName, re
     } finally { setBusy(false); }
   }
   const yearField = (station: ManualStation, name: "startYear" | "endYear" | "graduationYear", label: string, disabled = false) => <label>{label}<input type="number" min={1} max={9999} value={(name in station ? station[name as keyof typeof station] : null) as number | null ?? ""} disabled={disabled} onChange={event => update(station.key, { [name]: event.target.value === "" ? null : Number(event.target.value) })} /></label>;
-  if (receipt) return <section className={styles.card} aria-labelledby="participation-complete">
-    <h2 id="participation-complete">Dein Karriereweg wurde gespeichert</h2>
+  if (receipt) return <div className={styles.stack}><JourneyProgress step={3} /><section className={`${styles.card} ${styles.successCard}`} aria-labelledby="participation-complete">
+    <span className={styles.successIcon} aria-hidden="true">✓</span>
+    <p className="eyebrow">Teilnahme abgeschlossen</p>
+    <h2 id="participation-complete" ref={sectionHeading} tabIndex={-1}>Dein Karriereweg wurde gespeichert</h2>
     <p role="status">Vielen Dank! Dein Beitrag zur Befragung „{programName}“ ist angekommen. Du brauchst ihn nicht erneut abzusenden.</p>
     <p>{receipt.degrees} Studienabschlüsse, {receipt.careerSteps} berufliche oder weitere Stationen. Deine Angaben sind nur im geschützten Betreiberbereich zugänglich.</p>
-  </section>;
+    <p className={styles.completionNote}>Du kannst diese Seite jetzt schließen. Beim erneuten Aufrufen wird dir diese Bestätigung wieder angezeigt, solange deine Teilnahmesitzung verfügbar ist.</p>
+  </section></div>;
   return <div className={styles.stack}>
-    <p className="eyebrow">{reviewing ? "2. Prüfen und abgeben" : "1. Deinen Werdegang erfassen"}</p>
-    {error && <p role="alert">{error}</p>}
+    <JourneyProgress step={reviewing ? 2 : 1} />
+    <div className={styles.journeyLayout}><div className={styles.stack}>
+    {error && <p role="alert" ref={errorNotice} tabIndex={-1}>{error}</p>}
     {!reviewing ? <>
-      <p>{initialStations ? "Prüfe und ergänze die übernommenen Stationen." : "Trage deinen eigenen Studien- und Berufsweg ein."} Unbekannte Jahreszahlen kannst du freilassen. Name und E-Mail werden hier nicht abgefragt. Dein Beitrag wird erst nach der Prüfung und deiner Bestätigung gespeichert.</p>
-      {stations.map((station, index) => <fieldset key={station.key} className={`${styles.card} ${styles.stack}`}>
+      <div className={styles.sectionIntro}><h2>Deinen Werdegang erfassen</h2><p>{initialStations ? "Prüfe und ergänze die übernommenen Stationen." : "Trage deinen eigenen Studien- und Berufsweg ein."} Unbekannte Jahreszahlen kannst du freilassen. Name und E-Mail werden hier nicht abgefragt. Dein Beitrag wird erst nach der Prüfung und deiner Bestätigung gespeichert.</p></div>
+      {stations.map((station, index) => <fieldset key={station.key} className={`${styles.card} ${styles.stack} ${styles.stationCard}`}>
         <legend>{index + 1}. {station.kind === "DEGREE" ? "Studium" : "Berufliche oder weitere Station"}</legend>
         <label>Studium oder andere Station?<select aria-label="Studium oder andere Station?" value={station.kind} onChange={event => {
           const common = { key: station.key, title: station.title, startYear: station.startYear, endYear: station.endYear, status: "" };
@@ -90,26 +99,26 @@ export default function ManualEntry({ surveyId, programName, institutionName, re
           {yearField(station, "endYear", "Ende (Jahr, optional)", station.kind === "DEGREE" ? !["COMPLETED", "ENDED_WITHOUT_DEGREE"].includes(station.status) : station.status !== "ENDED")}
           {station.kind === "DEGREE" && yearField(station, "graduationYear", "Abschlussjahr (optional)", station.status !== "COMPLETED")}
         </div>
-        <div className={styles.actions}>
-          <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`${station.title || "Station"} nach oben`}>Nach oben</button>
-          <button type="button" disabled={index === stations.length - 1} onClick={() => move(index, 1)} aria-label={`${station.title || "Station"} nach unten`}>Nach unten</button>
-          <button type="button" onClick={() => { setStations(items => items.filter(s => s.key !== station.key)); if (referenceKey === station.key) setReferenceKey(""); }}>Station entfernen</button>
+        <div className={`${styles.actions} ${styles.stationActions}`}>
+          <button type="button" className={styles.secondary} disabled={index === 0} onClick={() => move(index, -1)} aria-label={`${station.title || "Station"} nach oben`}>Nach oben</button>
+          <button type="button" className={styles.secondary} disabled={index === stations.length - 1} onClick={() => move(index, 1)} aria-label={`${station.title || "Station"} nach unten`}>Nach unten</button>
+          <button type="button" className={styles.quiet} onClick={() => { setStations(items => items.filter(s => s.key !== station.key)); if (referenceKey === station.key) setReferenceKey(""); }}>Station entfernen</button>
         </div>
       </fieldset>)}
       <div className={styles.actions}>
-        <button type="button" disabled={stations.length >= 50} onClick={() => setStations(items => [...items, degree()])}>Studium ergänzen</button>
-        <button type="button" disabled={stations.length >= 50} onClick={() => setStations(items => [...items, career()])}>Berufliche oder weitere Station ergänzen</button>
+        <button type="button" className={styles.secondary} disabled={stations.length >= 50} onClick={() => setStations(items => [...items, degree()])}>Studium ergänzen</button>
+        <button type="button" className={styles.secondary} disabled={stations.length >= 50} onClick={() => setStations(items => [...items, career()])}>Berufliche oder weitere Station ergänzen</button>
       </div>
-      <section className={`${styles.card} ${styles.stack}`} aria-labelledby="own-degree-heading">
+      <section className={`${styles.card} ${styles.stack} ${styles.referenceCard}`} aria-labelledby="own-degree-heading">
         <h2 id="own-degree-heading">Dein Abschluss als Ausgangspunkt</h2>
         <p>Wähle selbst deinen abgeschlossenen Studienabschluss im Studiengang {programName}. Auch bei nur einem passenden Abschluss ist deine Auswahl erforderlich.</p>
         <label>Welcher eigene Abschluss gehört zu dieser Befragung?<select aria-label="Welcher eigene Abschluss gehört zu dieser Befragung?" required name="own-degree" value={referenceKey} onChange={event => setReferenceKey(event.target.value)}><option value="">Bitte selbst auswählen</option>{candidates.map(s => <option key={s.key} value={s.key}>{s.title}{s.kind === "DEGREE" && s.graduationYear ? ` · ${s.graduationYear}` : ""}</option>)}</select></label>
         {!candidates.length && <p>Ergänze oben einen abgeschlossenen Studienabschluss und ordne ihn diesem Studiengang zu.</p>}
       </section>
-      <button type="button" onClick={review}>Angaben prüfen</button>
+      <div className={styles.journeyActions}><p>Im nächsten Schritt kannst du alles noch einmal prüfen.</p><button type="button" onClick={review}>Angaben prüfen</button></div>
     </> : <section className={`${styles.card} ${styles.stack}`} aria-labelledby="manual-review-heading">
-      <h2 id="manual-review-heading">Deine Angaben prüfen</h2>
-      <ol className={styles.manualReview}>{stations.map(station => <li key={station.key}>
+      <h2 id="manual-review-heading" ref={sectionHeading} tabIndex={-1}>Deine Angaben prüfen</h2>
+      <ol className={styles.manualReview}>{stations.map(station => <li key={station.key} data-reference={station.key === referenceKey || undefined}>
         <h3>{station.title}{station.key === referenceKey ? " · Dein gewählter Abschluss" : ""}</h3>
         <p>{station.kind === "DEGREE" ? `${classificationChoices.find(c => c.value === `DEGREE:${station.level}`)?.label} · ${degreeStatuses.find(s => s.value === station.status)?.label}` : `${classificationChoices.find(c => c.value === `CAREER_STEP:${station.type}`)?.label} · ${careerStatuses.find(s => s.value === station.status)?.label}`}</p>
         <p>{station.kind === "DEGREE" ? station.program === "SURVEY" ? `${programName} · ${institutionName}` : station.institutionName || "Hochschule nicht angegeben" : station.organisationName || "Organisation nicht angegeben"}</p>
@@ -121,9 +130,15 @@ export default function ManualEntry({ surveyId, programName, institutionName, re
       <label className={styles.choice}><input type="checkbox" checked={referenceConfirmed} disabled={busy || uncertain} onChange={event => setReferenceConfirmed(event.target.checked)} />Ich bestätige, dass der ausgewählte Abschluss mein eigener abgeschlossener Studienabschluss im Studiengang {programName} ist.</label>
       <label className={styles.choice}><input type="checkbox" checked={contributionConfirmed} disabled={busy || uncertain} onChange={event => setContributionConfirmed(event.target.checked)} />Ich habe meine Angaben geprüft und möchte diesen Karriereweg für diese Befragung abgeben.</label>
       <div className={styles.actions}>
-        <button type="button" disabled={busy || uncertain} onClick={() => { setReviewing(false); setReferenceConfirmed(false); setContributionConfirmed(false); setError(""); }}>Angaben bearbeiten</button>
+        <button type="button" className={styles.secondary} disabled={busy || uncertain} onClick={() => { setReviewing(false); setReferenceConfirmed(false); setContributionConfirmed(false); setError(""); }}>Angaben bearbeiten</button>
         <button type="button" disabled={busy || !referenceConfirmed || !contributionConfirmed} onClick={() => void save()}>{busy ? "Wird gespeichert …" : "Verbindlich absenden"}</button>
       </div>
     </section>}
+    </div><aside className={`${styles.card} ${styles.journeyAside}`} aria-label="Hinweise zu deiner Teilnahme">
+      <p className="eyebrow">Deine Teilnahme</p><h2>{programName}</h2><p>{institutionName}</p>
+      <dl><dt>Stationen im Entwurf</dt><dd>{stations.length}</dd></dl>
+      <div className={styles.asideNote}><strong>Du behältst die Kontrolle</strong><p>Du kannst deine Angaben vor der Abgabe bearbeiten. Gespeichert wird erst nach deiner ausdrücklichen Bestätigung.</p></div>
+      <p className="demoNote">Name und E-Mail sind für deinen Beitrag nicht erforderlich.</p>
+    </aside></div>
   </div>;
 }

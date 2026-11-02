@@ -16,6 +16,7 @@ export default function Home() {
   }
   return (
     <main id="inhalt" tabIndex={-1} className="entry">
+      <header className="pageHero">
       <p className="eyebrow">Wege nach dem Studium</p>
       <h1>Alumni CareerMap</h1>
       <p className="lead">
@@ -25,6 +26,7 @@ export default function Home() {
       </p>
       <Link href="/review" className="primaryLink">Beispiel-Karriereweg ansehen</Link>
       <p className="demoNote">Eine Vorschau mit fiktiven Daten. Es findet keine Datenspende statt.</p>
+      </header>
 
       <section className="examplePreview" aria-labelledby="example-heading">
         <h2 id="example-heading">So kann ein Karriereweg aussehen</h2>

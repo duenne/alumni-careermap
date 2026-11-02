@@ -17,7 +17,7 @@ const request = (body?: unknown, cookie = "", extra = {}) => new NextRequest(`${
 });
 beforeEach(() => {
   for (const [key, value] of Object.entries({ ...localDemoEnvironment(), CAREERMAP_LOCAL_DEMO: "v5-participation", CAREERMAP_LOCAL_DEMO_PURPOSE: "LOCAL_PARTICIPATION", CAREERMAP_LOCAL_PARTICIPATION_SURVEY_ID: id })) vi.stubEnv(key, value);
-  vi.mocked(readSurveyInvitation).mockResolvedValue({ id, name: "Synthetische Testbefragung", status: "OPEN", referenceProgram: { id, name: "Master Informatik", faculty: null, institution: { id, name: "Synthetische Hochschule" } } });
+  vi.mocked(readSurveyInvitation).mockResolvedValue({ id, name: "Synthetische Testbefragung", status: "OPEN", entryHeading: null, entryIntro: null, entryWelcome: null, entryPurpose: null, entryContact: null, referenceProgram: { id, name: "Master Informatik", faculty: null, institution: { id, name: "Synthetische Hochschule" } } });
   vi.mocked(saveManualParticipation).mockResolvedValue({ alumniId: "PRIVATE_ALUMNI", responseId: "PRIVATE_RESPONSE", degrees: 1, careerSteps: 1, timelineItems: 2 });
 });
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllEnvs(); });

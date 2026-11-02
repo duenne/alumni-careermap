@@ -196,7 +196,7 @@ export default function MappingEditor({ workflow = false, participant }: { workf
         <button type="button" disabled={!text} onClick={parse}>JSON zuordnen</button>{" "}
         <button type="button" onClick={() => { ++sequence.current; linkedin.cancel(); resetSource(); setText(""); setOrigin("empty"); }}>Entwurf leeren</button>
   </>;
-  if(participant && receipt)return <main id="inhalt" className={styles.root}><DonationSteps step={3} /><h1>Vielen Dank für deine Datenspende</h1><p role="status">Dein Karriereweg und genau eine bestätigte Befragungsteilnahme wurden erfolgreich gespeichert.</p><p>{receipt.timelineItems} Timeline-Stationen. Die Bestätigung erfolgt nach dem Commit. Kontaktdaten wurden nicht erfasst.</p><p>Ergebnisse werden in diesem Prototyp ausschließlich im geschützten Betreiberbereich angezeigt.</p><section><h2>Nur für den Betreiber</h2><p>Der bestätigte Beitrag steht jetzt für diese Befragung zur Auswertung bereit. Für den folgenden Bereich ist der Betreiberzugang erforderlich.</p><a className="primaryLink" href={`/admin/surveys/${participant.surveyId}/analytics`}>Geschützte Auswertung öffnen</a></section><p><Link href="/">Zur Startseite</Link></p></main>;
+  if(participant && receipt)return <main id="inhalt" className={`${styles.root} ${styles.complete}`}><DonationSteps step={3} /><h1>Vielen Dank für deine Datenspende</h1><p role="status">Dein Karriereweg und genau eine bestätigte Befragungsteilnahme wurden erfolgreich gespeichert.</p><p>{receipt.timelineItems} Timeline-Stationen. Die Bestätigung erfolgt nach dem Commit. Kontaktdaten wurden nicht erfasst.</p><p>Ergebnisse werden in diesem Prototyp ausschließlich im geschützten Betreiberbereich angezeigt.</p><section><h2>Nur für den Betreiber</h2><p>Der bestätigte Beitrag steht jetzt für diese Befragung zur Auswertung bereit. Für den folgenden Bereich ist der Betreiberzugang erforderlich.</p><a className="primaryLink" href={`/admin/surveys/${participant.surveyId}/analytics`}>Geschützte Auswertung öffnen</a></section><p><Link href="/">Zur Startseite</Link></p></main>;
   return <main id="inhalt" tabIndex={-1} className={styles.root}>
     {!workflow && !participant && <a href="http://localhost:3100/dev/import">Zum vollständigen LinkedIn-Workflow</a>}
     <p className="eyebrow">{participant ? "Alumni-Befragung · Lokaler Entwicklungsprototyp" : "Lokaler vertikaler Zwischentest"}</p>
@@ -314,7 +314,7 @@ export default function MappingEditor({ workflow = false, participant }: { workf
           <div id="save-readiness" role="status" className={styles.readiness}>
             {receipt ? <p>Dieser Beitrag ist bereits gespeichert.</p> : blockers.length ? <><h3>Noch zu prüfen</h3><ul>{blockers.map((blocker, index) => <li key={`${blocker.target}-${index}`}><a href={`#${blocker.target}`}>{blocker.message}</a></li>)}</ul></> : <p>Alle Voraussetzungen erfüllt. Du kannst den Beitrag jetzt speichern.</p>}
           </div>
-          <button type="button" disabled={!!receipt || !context} aria-describedby="save-readiness" onClick={save}>{participant ? "Datenspende verbindlich speichern" : "In Testdatenbank speichern"}</button>
+          <button type="button" className={styles.primary} disabled={!!receipt || !context} aria-describedby="save-readiness" onClick={save}>{participant ? "Datenspende verbindlich speichern" : "In Testdatenbank speichern"}</button>
         </section>
       </>}
     </fieldset>

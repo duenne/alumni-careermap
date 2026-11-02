@@ -5,6 +5,7 @@ import { linkedInDraft } from "../../../lib/donation/linkedin-draft";
 import type { ManualStation } from "../../../lib/donation/manual";
 import ManualEntry from "./manual-entry";
 import styles from "../surveys.module.css";
+import JourneyProgress from "../journey-progress";
 
 export default function LinkedInEntry({ surveyId, programName, institutionName }: { surveyId: string; programName: string; institutionName: string }) {
   const linkedIn = useLinkedInImport({ endpoint: "/api/participation/linkedin" });
@@ -29,7 +30,7 @@ export default function LinkedInEntry({ surveyId, programName, institutionName }
     {imported && <p className={styles.previewNotice}>Deine LinkedIn-Stationen wurden als bearbeitbarer Entwurf übernommen. Die LinkedIn-Verbindung ist getrennt. Prüfe die Angaben und ordne deinen eigenen Abschluss dem Studiengang {programName} zu. Noch wurde kein Beitrag gespeichert.</p>}
     <ManualEntry surveyId={surveyId} programName={programName} institutionName={institutionName} initialStations={imported ?? undefined} />
   </>;
-  return <section className={`${styles.card} ${styles.stack} ${styles.previewStudy}`} aria-labelledby="linkedin-participation-heading">
+  return <div className={styles.stack}><JourneyProgress step={1} /><section className={`${styles.card} ${styles.stack} ${styles.linkedInCard}`} aria-labelledby="linkedin-participation-heading">
     <p className="eyebrow">1. Angaben aus LinkedIn übernehmen</p>
     <h2 id="linkedin-participation-heading">Deine Stationen als Ausgangspunkt</h2>
     <p>Verbinde dich mit LinkedIn, um deine Studien- und Berufsstationen einmalig zu übernehmen. Danach kannst du alles prüfen, ändern und ergänzen.</p>
@@ -42,6 +43,6 @@ export default function LinkedInEntry({ surveyId, programName, institutionName }
     </>}
     {linkedIn.checked && !linkedIn.configured && <p>LinkedIn steht gerade nicht zur Verfügung. Du kannst deine Angaben selbst eintragen.</p>}
     {(linkedIn.error || error) && <p role="alert">{linkedIn.error || error}</p>}
-    <button type="button" disabled={busy} onClick={() => void withoutLinkedIn()}>Ohne LinkedIn fortfahren</button>
-  </section>;
+    <button type="button" className={styles.secondary} disabled={busy} onClick={() => void withoutLinkedIn()}>Ohne LinkedIn fortfahren</button>
+  </section></div>;
 }

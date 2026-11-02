@@ -4,7 +4,7 @@ test("operator adds a faculty/program and participants explicitly accept local c
  const user = await browser.newContext({ baseURL });
  try {
   const p = await admin.newPage(); await p.goto("/admin/surveys");
-  await p.getByRole("button", { name: "Neu anlegen", exact: true }).click();
+  await p.getByRole("button", { name: "Neue Befragung", exact: true }).click();
   await p.getByLabel("Fakultät (optional)", { exact: true }).fill("Synthetic Added Faculty");
   const name = `Synthetic Added Program ${info.project.name}`;
   await p.getByLabel("Name des neuen Studiengangs", { exact: true }).fill(name);
@@ -64,7 +64,7 @@ test("survey invitation -> reviewed synthetic careers -> one confirmed response 
  try{
   const p=await admin.newPage();await p.goto("/");await expect(p.getByRole("heading",{name:"Eine gemeinsame Journey"})).toBeVisible();await p.getByRole("link",{name:"Befragungen verwalten",exact:true}).click();
   const ids:string[]=[];let dashboardPath="";
-  await p.getByRole("button",{name:"Neu anlegen",exact:true}).click();
+  await p.getByRole("button",{name:"Neue Befragung",exact:true}).click();
   for(const suffix of ["A","B"]){
    await p.getByLabel("Hochschule",{exact:true}).selectOption({label:"Synthetic Mapping Institute"});
    await p.getByLabel("Studiengang",{exact:true}).selectOption({label:"Management Sozialer Innovationen · Synthetic Survey Faculty"});
@@ -104,6 +104,9 @@ test("survey invitation -> reviewed synthetic careers -> one confirmed response 
   expect(data.responses).toBe(2);expect(data.profiles).toHaveLength(2);
   expect((await(await admin.request.get(`/api/admin/surveys/${ids[1]}/analytics`)).json()).responses).toBe(1);
   await p.goto(dashboardPath);
+  await p.getByRole("button", { name: "Typische Karrierepfade", exact: true }).click();
+  await p.getByText("Erweiterte Analyseoptionen", { exact: true }).click();
+  await p.getByText("Daten und Auswertungsmethodik", { exact: true }).click();
   await expect(p.getByText(/2 Profile im Diagramm.*6 Übergangsbeiträge/)).toBeVisible();
   await expect(p.getByRole("group",{name:/MSI-Karrierepfade/})).toBeVisible();
   const node=p.locator('svg g[role="button"]').first();await node.focus();await node.press("Enter");await expect(node).toHaveAttribute("aria-pressed","true");await node.press("Escape");await expect(node).toHaveAttribute("aria-pressed","false");

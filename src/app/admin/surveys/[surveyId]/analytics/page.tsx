@@ -10,7 +10,7 @@ export const metadata={title:"Befragung auswerten · Alumni CareerMap",robots:{i
 export default async function Analytics({params}:{params:Promise<{surveyId:string}>}){
  if(surveyAccess(await headers(),true)!==200)notFound();const {surveyId}=await params;if(!isSurveyId(surveyId))notFound();
  let data;try{data=await readSurveyAnalytics(await surveyClient(),surveyId,surveyConfiguration(),surveyPilotProgramId());}catch{notFound();}
- if(!data.supported)return <main id="inhalt"><h1>{data.survey.name} · Auswertung</h1><p>Die Vier-/Sieben-Stufen-Projektion ist ausschließlich für den explizit konfigurierten MSI-Bachelor-Piloten definiert. Für diesen Studiengang ist sie nicht freigegeben.</p></main>;
+ if(!data.supported)return <main id="inhalt"><p><a href="/admin/surveys">Zur Befragungsverwaltung</a></p><header className="pageHero"><p className="eyebrow">Befragung auswerten</p><h1>{data.survey.name} · Auswertung</h1><p>Die Vier-/Sieben-Stufen-Projektion ist ausschließlich für den explizit konfigurierten MSI-Bachelor-Piloten definiert. Für diesen Studiengang ist sie nicht freigegeben.</p></header></main>;
  const syntheticDemo = localDemoRequested() && data.survey.id !== readLocalDemoConfiguration().participationSurveyId;
- return <><p style={{padding:".5rem 1rem",margin:0}}><a href="/admin/surveys">Zur Befragungsverwaltung</a></p><Dashboard profiles={data.profiles} survey={{...data.survey,responses:data.responses}} diagnostics={data.excluded} syntheticDemo={syntheticDemo}/></>;
+ return <><nav className="pageNavigation" aria-label="Befragungsverwaltung"><a href="/admin/surveys">← Zur Befragungsverwaltung</a></nav><Dashboard profiles={data.profiles} survey={{...data.survey,responses:data.responses}} diagnostics={data.excluded} syntheticDemo={syntheticDemo}/></>;
 }

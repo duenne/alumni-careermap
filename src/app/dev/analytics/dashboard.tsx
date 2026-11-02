@@ -26,7 +26,7 @@ export default function Dashboard({ profiles, survey, diagnostics = [], syntheti
     </tbody></table></div>}
     <p>Zeitlich ungeklärt zählt Stationen mit fehlenden Zeitangaben oder ungeklärter Ankerrelation jeweils einmal. Bei fehlendem Demoanker wird nur die Vollständigkeit der Zeitangaben gezählt.</p>
   </section>;
-  return <main id="main-content" className={`${styles.main} ${survey ? styles.survey : ""}`}>
+  return <main id="inhalt" tabIndex={-1} className={`${styles.main} ${survey ? styles.survey : ""}`}>
     {survey ? <header className={styles.intro}>
       <p className="eyebrow">ALUMNI CAREERMAP · AUSWERTUNG</p>
       <h1>Karrierewege nach Management Sozialer Innovationen</h1>
